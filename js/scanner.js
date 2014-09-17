@@ -30,6 +30,7 @@ var db = {
 	last_reg:[],
 	last_new_reg:[],
 	global_values:[], //global_values[0] holds company name data
+	global_date:'0/0/0000',
 	add:function(entry) {
 		db.raw_data.push(entry);
 		db.entries.push({
@@ -120,7 +121,10 @@ var db = {
 	}
 };
 
-parseDB();
+parseDB(function() {
+	var date = new Date();
+	db.global_date = date.getMonth()+'/'+date.getDate()+'/'+date.getFullYear();
+});
 
 var stdin = process.stdin;
 process.stdin.setEncoding('utf8');
@@ -180,11 +184,10 @@ var server = http.createServer(function(req,res) {
 				}
 
 				if(name.length > 0) {
-					var date = new Date();
 					var entry = db.get(name[0].index);
 
 					entry.visits++;
-					entry.events += (db.global_values[0] || date.getMonth()+'/'+date.getDate()+'/'+date.getFullYear())+',';
+					entry.events += (db.global_values[0] || db.global_date)+',';
 
 					db.register(name[0]);
 
@@ -265,7 +268,7 @@ var server = http.createServer(function(req,res) {
 
 				} else if(command[1] == 'event') {
 					if(command[2] == 'name') {
-						db.global_values.push(decodeURIComponent(command[3]));
+						db.global_values[0] = decodeURIComponent(command[3]+' ('+db.global_date+')');
 						res.end('success');
 					} else if(command[2] == 'delete') {						
 						if(command[3] == 'top') {

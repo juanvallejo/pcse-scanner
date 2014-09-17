@@ -265,7 +265,7 @@ var server = http.createServer(function(req,res) {
 
 				} else if(command[1] == 'event') {
 					if(command[2] == 'name') {
-						db.global_values.push(command[3]);
+						db.global_values.push(decodeURIComponent(command[3]));
 						res.end('success');
 					} else if(command[2] == 'delete') {						
 						if(command[3] == 'top') {

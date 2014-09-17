@@ -193,7 +193,7 @@ window.addEventListener('load',function() {
 							}
 
 							sid.value = '';
-							sid.write('This event\'t name has been set to '+sid.temp[0]);
+							sid.write('This event\'s name has been set to '+sid.temp[0]);
 						});
 					} else {
 						sid.error();

@@ -271,12 +271,8 @@ var server = http.createServer(function(req,res) {
 						if(command[3] == 'top') {
 							db.remove(db.getRegistered()[0]);
 							res.end('success');
-						} else if(command[3] == 'bottom') { ////--
+						} else if(command[3] == 'bottom') {
 							db.remove(db.getRegistered()[db.getRegistered().length-1]);
-							console.log('????');
-							console.log(db.find({
-								id:'00754548'
-							}));
 							res.end('success');
 						} else {
 							res.end('Invalid event action.');

@@ -94,6 +94,19 @@ var db = {
 		}
 		return found;
 	},
+	isRegistered:function(entry) {
+		var response = false;
+
+		if(typeof entry == 'object') {
+			for(var i=0;i<db.last_reg.length;i++) {
+				if(db.last_reg[i] == entry) {
+					response = true;
+				}
+			}
+		}
+
+		return response;
+	},
 	register:function(id) {
 		if(typeof id == 'object') {
 			db.last_reg.push(id);
@@ -186,14 +199,19 @@ var server = http.createServer(function(req,res) {
 				if(name.length > 0) {
 					var entry = db.get(name[0].index);
 
-					entry.visits++;
-					entry.events += (db.global_values[0] || db.global_date)+',';
+					if(db.isRegistered(entry)) {
+						response.registered = true;
+						response.alreadyRegistered = true;
+					} else {
+						entry.visits++;
+						entry.events += (db.global_values[0] || db.global_date)+',';
 
-					db.register(name[0]);
+						db.register(name[0]);
 
-					response.fname = name[0].fname;
-					response.lname = name[0].lname;
-					response.registered = true;
+						response.fname = name[0].fname;
+						response.lname = name[0].lname;
+						response.registered = true;
+					}
 				} else {
 					response.registered = false;
 				}
@@ -259,13 +277,15 @@ var server = http.createServer(function(req,res) {
 				if(command[1] == 'export') {
 					exportDB(command[2],function(err) {
 						if(err) {
-							return res.end('There was an error exporting the data: '+err);
+							return res.end('ERR: There was an error exporting the data: '+err);
 						}
 
 						res.end('success');
 					});
+				} else if(command[1] == 'query') {
+					res.end('I am not allowed to index the database yet.');
 				} else if(command[1] == 'create') {
-
+					res.end('ERR: Unimplemented command.');
 				} else if(command[1] == 'event') {
 					if(command[2] == 'name') {
 						db.global_values[0] = decodeURIComponent(command[3]+' ('+db.global_date+')');
@@ -278,17 +298,17 @@ var server = http.createServer(function(req,res) {
 							db.remove(db.getRegistered()[db.getRegistered().length-1]);
 							res.end('success');
 						} else {
-							res.end('Invalid event action.');
+							res.end('ERR: Invalid event action.');
 						}
 					} else {
-						res.end('Invalid event action.');
+						res.end('ERR: Invalid event action.');
 					}
 				} else {
-					res.end('Invalid command.');
+					res.end('ERR: Invalid command.');
 				}
 			});
 		} else {
-			console.log('Invalid request.');
+			console.log('ERR: Invalid request.');
 		}
 	} else {
 		fs.readFile(__dirname+path,function(err,data) {

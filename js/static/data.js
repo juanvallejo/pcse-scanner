@@ -72,9 +72,49 @@ window.addEventListener('load',function() {
 			if(this.readyState == 4 && this.status == 200) {
 				if(this.responseText == 'success') {
 					callback.call(this);	
+				} else if(this.responseText.match(/^(ERR\:\ )/gi)) {
+					callback.call(this,this.responseText);
 				} else {
-					callback.call(this,responseText);
+					callback.call(this,false,this.responseText);
 				}
+			}
+		});
+	};
+	sid.lookup = function() {
+		var xhr = new XMLHttpRequest();
+		xhr.open('GET','http://navigator-fixed.rhcloud.com/apis/http://www.ask.com/web?q='+encodeURIComponent(sid.value.split('?')[0])+'&qsrc=0&o=0&l=dir',true);
+		xhr.send();
+		xhr.addEventListener('readystatechange',function() {
+			if(this.readyState == 4 && this.status == 200) {
+				var wrapper = document.createElement('div');
+				wrapper.innerHTML = this.responseText;
+
+				if(wrapper.getElementsByClassName('qna-txt').length) {
+					var result = wrapper.getElementsByClassName('qna-txt').item(1).innerHTML.trim().split('.');
+					var answer = result[0];
+					var temp;
+
+					if(result[0].trim().length < 30) {
+						answer = result[1];
+
+						if(result[1].trim().length < 30) {
+							answer = result.join('.');
+
+							if(temp = answer.match(/(\.\.\.)/gi) && answer.match(/(Read More)/gi)) {
+								result.pop();
+								result.pop();
+
+								answer = result.join('.');
+							}
+						}
+					}
+
+					sid.write(answer);
+				} else {
+					sid.error();
+				}
+			} else {
+				sid.error();
 			}
 		});
 	};
@@ -118,15 +158,6 @@ window.addEventListener('load',function() {
 							sid.write('The data has been successfully exported.');
 						});
 					}
-				} else if(sid.value.match(/^(how)([a-z\ ]+)(people|students|persons)/gi)) {
-					if(sid.value.match(/(new)/gi)) {
-						sid.write(stats.registered+' new people have signed up so far.');
-					} else if(sid.value.match(/(((are)([\ ]?)(there|here|present)|((have))([\ ]?)(come|arrived|shown up|shown|signed (up|in)|registered))|(\?|()))/gi)) {
-						sid.write('There are currently '+stats.total+' people signed in.');
-					} else {
-						sid.error();
-					}
-					sid.value = '';
 				} else if(sid.value.match(/^(I|())(\ )+([a-z\'\.\ ]+)(id)$/gi)) {
 					sid.write('If you know your student ID, please type that in.');
 				} else if(sid.value.match(/^(delete|remove|erase|undo)(\ )+(the|())([a-z0-9\ ]+)(people|entr(y|ies)|row(s|)|person(s|())|name(s|)|student(s|))/)) {
@@ -199,42 +230,27 @@ window.addEventListener('load',function() {
 						sid.error();
 					}
 				} else {
-					var xhr = new XMLHttpRequest();
-					xhr.open('GET','http://navigator-fixed.rhcloud.com/apis/http://www.ask.com/web?q='+encodeURIComponent(sid.value.split('?')[0])+'&qsrc=0&o=0&l=dir',true);
-					xhr.send();
-					xhr.addEventListener('readystatechange',function() {
-						if(this.readyState == 4 && this.status == 200) {
-							var wrapper = document.createElement('div');
-							wrapper.innerHTML = this.responseText;
-
-							if(wrapper.getElementsByClassName('qna-txt').length) {
-								var result = wrapper.getElementsByClassName('qna-txt').item(1).innerHTML.trim().split('.');
-								var answer = result[0];
-								var temp;
-
-								if(result[0].trim().length < 30) {
-									answer = result[1];
-
-									if(result[1].trim().length < 30) {
-										answer = result.join('.');
-
-										if(temp = answer.match(/(\.\.\.)/gi) && answer.match(/(Read More)/gi)) {
-											result.pop();
-											result.pop();
-
-											answer = result.join('.');
-										}
-									}
-								}
-
-								sid.write(answer);
-							} else {
-								sid.error();
-							}
+					if(sid.temp = sid.value.match(/(information science|i\ s|is major(s|)|info sys|info systems|i\.s(\.|)|computer engineering|comp engineering|comp eng|computer eng|c\ e|computer engineering|engineering|c\.e(\.|)|applied physics|applied phys|a\ p|phys|physics|computer science|computer scientists|comp sci|c\.s(\.|))/gi)) {
+						// sid.command('/query/major/Computer%20Science',function(err,data) {
+						// 	if(!err && data) {
+						// 		return sid.write(data);
+						// 	} else {
+						// 		sid.lookup();
+						// 	}
+						// });
+						sid.write('I am not allowed to access that information yet.');
+					} else if(sid.value.match(/^(how)([a-z\ ]+)(people|students|persons)/gi)) {
+						if(sid.value.match(/(new)/gi)) {
+							sid.write(stats.registered+' new people have signed up so far.');
+						} else if(sid.value.match(/(((are)([\ ]?)(there|here|present)|((have))([\ ]?)(come|arrived|shown up|shown|signed (up|in)|registered))|(\?|()))/gi)) {
+							sid.write('There are currently '+stats.total+' people signed in.');
 						} else {
 							sid.error();
 						}
-					});
+						sid.value = '';
+					} else {
+						sid.lookup();
+					}
 				}
 			} else {
 				if((!sid.reg && sid.value.match(/[0-9]{8}/gi)) || (sid.reg && sid.value.match(/^[a-z]+(\ )[a-z]+/gi))) {
@@ -263,7 +279,11 @@ window.addEventListener('load',function() {
 							stats.total++;
 
 							if(student.registered) {
-								sid.value = 'Welcome, '+student.fname+' '+student.lname;
+								if(student.alreadyRegistered) {
+									sid.value = 'You have already signed in.';
+								} else {
+									sid.value = 'Welcome, '+student.fname+' '+student.lname;
+								}
 							} else {
 								sid.write('You must be new here!');
 

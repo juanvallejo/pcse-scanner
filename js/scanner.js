@@ -41,24 +41,23 @@ var db = {
 			major:entry[4],
 			email:entry[5],
 			visits:entry[6] == ' ' ? 0 : parseInt(entry[6]),
-			events:(!entry[7]) ? '' : entry[7]
+			events:(!entry[7]) ? '' : entry[7],
+			deleted:false
 		});
-	},
-	addLastRegistered:function(id) {
-		db.last_reg.push(db.find({
-			id:id
-		})[0]);
-	},
-	addLastNewRegistered:function(id) {
-		db.last_new_reg.push(db.find({
-			id:id
-		})[0]);
+
+		return db.entries[db.entries.length-1];
 	},
 	get:function(index) {
 		return db.entries[index];
 	},
 	getRawData:function() {
 		return db.raw_data;
+	},
+	getRegistered:function() {
+		return db.last_reg;
+	},
+	getRegisteredNew:function() {
+		return db.last_new_reg;
 	},
 	find:function(term) {
 		var results = [];
@@ -93,6 +92,25 @@ var db = {
 			}
 		}
 		return found;
+	},
+	register:function(id) {
+		if(typeof id == 'object') {
+			db.last_reg.push(id);
+		} else {
+			db.last_reg.push(db.find({
+				id:id
+			})[0]);
+		}
+	},
+	registerNew:function(id) {
+		db.last_new_reg.push(db.find({
+			id:id
+		})[0]);
+	},
+	remove:function(entry) {
+		if(entry) {
+			entry.deleted = true;
+		}
 	},
 	setRawData:function(data) {
 		raw_data = data;
@@ -168,7 +186,7 @@ var server = http.createServer(function(req,res) {
 					entry.visits++;
 					entry.events += (db.global_values[0] || date.getMonth()+'/'+date.getDate()+'/'+date.getFullYear())+',';
 
-					db.addLastRegistered();
+					db.register(name[0]);
 
 					response.fname = name[0].fname;
 					response.lname = name[0].lname;
@@ -198,6 +216,8 @@ var server = http.createServer(function(req,res) {
 					console.log('Registering '+name+' with ID '+id);
 				}
 
+				db.registerNew(id);
+
 				db.add([
 					id,
 					name[1],
@@ -217,8 +237,6 @@ var server = http.createServer(function(req,res) {
 					response.fname = name[0];
 					response.lname = name[1];
 					response.registered = true;
-
-					db.addLastNewRegistered(id);
 				} else {
 					response.registered = false;
 				}
@@ -249,6 +267,20 @@ var server = http.createServer(function(req,res) {
 					if(command[2] == 'name') {
 						db.global_values.push(command[3]);
 						res.end('success');
+					} else if(command[2] == 'delete') {						
+						if(command[3] == 'top') {
+							db.remove(db.getRegistered()[0]);
+							res.end('success');
+						} else if(command[3] == 'bottom') { ////--
+							db.remove(db.getRegistered()[db.getRegistered().length-1]);
+							console.log('????');
+							console.log(db.find({
+								id:'00754548'
+							}));
+							res.end('success');
+						} else {
+							res.end('Invalid event action.');
+						}
 					} else {
 						res.end('Invalid event action.');
 					}
@@ -328,16 +360,18 @@ function exportDB(type,callback) {
 		var entry = {};
 		for(var i=0;i<db.size();i++) {
 			entry = db.get(i);
-			data.push({
-				'ID':entry.id,
-				'LAST':entry.lname,
-				'FIRST':entry.fname,
-				'STUCLASS_DESC':entry.year,
-				'MAJR1':entry.major,
-				'EMAIL':entry.email,
-				'VISITS':(""+entry.visits+""),
-				'EVENTS':entry.events
-			});
+			if(!entry.deleted) {
+				data.push({
+					'ID':entry.id,
+					'LAST':entry.lname,
+					'FIRST':entry.fname,
+					'STUCLASS_DESC':entry.year,
+					'MAJR1':entry.major,
+					'EMAIL':entry.email,
+					'VISITS':(""+entry.visits+""),
+					'EVENTS':entry.events
+				});
+			}
 		}
 
 		xlsx.write('db.xlsx',data,function(err) {

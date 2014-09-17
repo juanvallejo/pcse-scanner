@@ -129,26 +129,54 @@ window.addEventListener('load',function() {
 					sid.value = '';
 				} else if(sid.value.match(/^(I|())(\ )+([a-z\'\.\ ]+)(id)$/gi)) {
 					sid.write('If you know your student ID, please type that in.');
-				} else if(sid.value.match(/^(delete|remove|erase|undo)(\ )+(the|())([a-z0-9\ ]+)(people|person(s|())|name(s|)|student(s|))/)) {
-					if(sid.value.match(/(last|first|latest)([\ ]+)(two|three|four|five|six|seven|eight|nine|ten)?(\ )*(new)?(\ )*(person|student|name)/gi)) {
-						if(sid.value.match(/(latest)/gi) || sid.value.match(/(last)([\ ]+)(new)?(\ )*(person|student|name)/gi)) {
+				} else if(sid.value.match(/^(delete|remove|erase|undo)(\ )+(the|())([a-z0-9\ ]+)(people|entr(y|ies)|row(s|)|person(s|())|name(s|)|student(s|))/)) {
+					if(sid.value.match(/(last|first|latest)([\ ]+)(two|three|four|five|six|seven|eight|nine|ten)?(\ )*(new)?(\ )*(person|student|name|entry|row)/gi)) {
+						if(sid.value.match(/(latest)/gi) || sid.value.match(/(last)([\ ]+)(new)?(\ )*(person|student|name|entry|row)/gi)) {
 							//remove the last person signed in
 							if(sid.value.match(/(new)/gi)) {
-								sid.write('The last new person signed in has been removed.');
+								sid.command('/event/delete/bottom/1/new',function(err) {
+									if(err) {
+										return sid.error('The event requested could not be removed: '+err);
+									}
+
+									sid.write('The last new person signed in has been removed.');
+								});
 							} else {
-								sid.write('The last person signed in has been removed.');
+								sid.command('/event/delete/bottom/1',function(err) {
+									if(err) {
+										return sid.error('The event requested could not be removed: '+err);
+									}
+
+									sid.write('The last person signed in has been removed.');
+								});
 							}
-						} else if(sid.value.match(/(first (person|student|name))/gi)) {
+						} else if(sid.value.match(/(first (person|student|name|entry|row))/gi)) {
 							//remove the first student signed in
 							if(sid.value.match(/(new)/gi)) {
-								sid.write('The first new person signed in has been removed.');
+								sid.command('/event/delete/top/1/new',function(err) {
+									if(err) {
+										return sid.error('The event requested could not be removed: '+err);
+									}
+
+									sid.write('The first new person signed in has been removed.');
+								});
 							} else {
-								sid.write('The first person signed in has been removed.');
+								//'event/delete/(top|bottom|id)/(amount|amount|id)/flag
+								sid.command('/event/delete/top/1',function(err) {
+									if(err) {
+										return sid.error('The event requested could not be removed: '+err);
+									}
+
+									sid.write('The first person signed in has been removed.');
+								});
 							}
+						} else if(sid.value.match(/(people|persons|names|students|rows)/gi)) {
+							//remove x amount of people
+							sid.error('I can\'t do that yet.');
 						} else {
 							sid.error();
 						}
-					} else if(sid.temp = sid.value.match(/(last|first|latest)(\ )+([0-9]+)(\ )+(new)?(\ )*(people|students|names)/gi)) {
+					} else if(sid.temp = sid.value.match(/(last|first|latest)(\ )+([0-9]+)(\ )+(new)?(\ )*(people|students|names|rows|entries)/gi)) {
 						if(sid.value.match(/(new)/gi)) {
 							sid.write('The last '+sid.temp[0].split(' ')[1]+' new people have been deleted.');
 						} else {
@@ -161,7 +189,7 @@ window.addEventListener('load',function() {
 					if(sid.temp = sid.value.match(/(["']{1})([a-z\ 0-9\.\,\-\_\+\=\(\)\:\;\/\%\$\#\@\!\*]+)(["']{1})/gi)) {
 						sid.command('/event/name/'+encodeURIComponent(sid.temp[0].substring(1,sid.temp[0].length-1)),function(err) {
 							if(err) {
-								return sid.write('The event\'s name could not be set: '+err);
+								return sid.error('The event\'s name could not be set: '+err);
 							}
 
 							sid.value = '';

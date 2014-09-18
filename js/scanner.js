@@ -137,6 +137,17 @@ var db = {
 parseDB(function() {
 	var date = new Date();
 	db.global_date = date.getMonth()+'/'+date.getDate()+'/'+date.getFullYear();
+
+	var autosave = (function auto_save_process() {
+		exportDB('excel','db_autosave.xlsx',function(err) {
+			if(err) {
+				return console.log('There was an error auto-saving to the database: '+err);
+			}
+
+			console.log('The database has been auto-saved');
+			setTimeout(auto_save_process,(1000*60));
+		});
+	})();
 });
 
 var stdin = process.stdin;
@@ -247,7 +258,7 @@ var server = http.createServer(function(req,res) {
 					'N/A',
 					'N/A',
 					'1',
-					db.global_values[0]
+					(db.global_values[0] || db.global_date)+','
 				]);
 
 				var response = {
@@ -363,10 +374,19 @@ function parseBarcode(code) {
 	}
 };
 
-function exportDB(type,callback) {
-	if(type == 'excel') {
-		if(fs.existsSync('db.xlsx')) {
-			fs.unlink('db.xlsx',function(err) {
+function exportDB(type,fname,callback) {
+	if(typeof fname == 'function' && !callback) {
+		callback = fname;
+		fname = null;
+	}
+
+	if(!fname) {
+		fname = 'db.xlsx';
+	}
+
+	if(type == 'excel' || !type) {
+		if(fs.existsSync(fname)) {
+			fs.unlink(fname,function(err) {
 				if(err) {
 					return console.log(err);
 				}
@@ -393,7 +413,7 @@ function exportDB(type,callback) {
 			}
 		}
 
-		xlsx.write('db.xlsx',data,function(err) {
+		xlsx.write(fname,data,function(err) {
 			if(err) {
 				return console.log(err);
 			}

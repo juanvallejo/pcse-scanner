@@ -57,6 +57,7 @@ window.addEventListener('load',function() {
 	var sid = document.getElementById('sid-input');
 	sid.focus();
 	sid.state = 1;
+	
 	sid.error = function(err) {
 		sid.write(err || 'I couldn\'t understand that.');
 	};

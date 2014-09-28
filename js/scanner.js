@@ -32,6 +32,7 @@ var db = {
 	global_values:[], //global_values[0] holds company name data
 	global_date:'0/0/0000',
 	add:function(entry) {
+		console.log('>'+entry[7]+'<');
 		db.raw_data.push(entry);
 		db.entries.push({
 			index:db.entries.length,
@@ -214,6 +215,7 @@ var server = http.createServer(function(req,res) {
 						response.registered = true;
 						response.alreadyRegistered = true;
 					} else {
+						console.log("test");
 						entry.visits++;
 						entry.events += (db.global_values[0] || db.global_date)+',';
 

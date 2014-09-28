@@ -30,9 +30,7 @@ var db = {
 	last_reg:[],
 	last_new_reg:[],
 	global_values:[], //global_values[0] holds company name data
-	global_date:'0/0/0000',
 	add:function(entry) {
-		console.log('>'+entry[7]+'<');
 		db.raw_data.push(entry);
 		db.entries.push({
 			index:db.entries.length,
@@ -95,19 +93,6 @@ var db = {
 		}
 		return found;
 	},
-	isRegistered:function(entry) {
-		var response = false;
-
-		if(typeof entry == 'object') {
-			for(var i=0;i<db.last_reg.length;i++) {
-				if(db.last_reg[i] == entry) {
-					response = true;
-				}
-			}
-		}
-
-		return response;
-	},
 	register:function(id) {
 		if(typeof id == 'object') {
 			db.last_reg.push(id);
@@ -135,21 +120,7 @@ var db = {
 	}
 };
 
-parseDB(function() {
-	var date = new Date();
-	db.global_date = date.getMonth()+'/'+date.getDate()+'/'+date.getFullYear();
-
-	var autosave = (function auto_save_process() {
-		exportDB('excel','db_autosave.xlsx',function(err) {
-			if(err) {
-				return console.log('There was an error auto-saving to the database: '+err);
-			}
-
-			console.log('The database has been auto-saved');
-			setTimeout(auto_save_process,(1000*60));
-		});
-	})();
-});
+parseDB();
 
 var stdin = process.stdin;
 process.stdin.setEncoding('utf8');
@@ -209,22 +180,17 @@ var server = http.createServer(function(req,res) {
 				}
 
 				if(name.length > 0) {
+					var date = new Date();
 					var entry = db.get(name[0].index);
 
-					if(db.isRegistered(entry)) {
-						response.registered = true;
-						response.alreadyRegistered = true;
-					} else {
-						console.log("test");
-						entry.visits++;
-						entry.events += (db.global_values[0] || db.global_date)+',';
+					entry.visits++;
+					entry.events += (db.global_values[0] || date.getMonth()+'/'+date.getDate()+'/'+date.getFullYear())+',';
 
-						db.register(name[0]);
+					db.register(name[0]);
 
-						response.fname = name[0].fname;
-						response.lname = name[0].lname;
-						response.registered = true;
-					}
+					response.fname = name[0].fname;
+					response.lname = name[0].lname;
+					response.registered = true;
 				} else {
 					response.registered = false;
 				}
@@ -260,7 +226,7 @@ var server = http.createServer(function(req,res) {
 					'N/A',
 					'N/A',
 					'1',
-					(db.global_values[0] || db.global_date)+','
+					db.global_values[0]
 				]);
 
 				var response = {
@@ -290,38 +256,40 @@ var server = http.createServer(function(req,res) {
 				if(command[1] == 'export') {
 					exportDB(command[2],function(err) {
 						if(err) {
-							return res.end('ERR: There was an error exporting the data: '+err);
+							return res.end('There was an error exporting the data: '+err);
 						}
 
 						res.end('success');
 					});
-				} else if(command[1] == 'query') {
-					res.end('I am not allowed to index the database yet.');
 				} else if(command[1] == 'create') {
-					res.end('ERR: Unimplemented command.');
+
 				} else if(command[1] == 'event') {
 					if(command[2] == 'name') {
-						db.global_values[0] = decodeURIComponent(command[3]+' ('+db.global_date+')');
+						db.global_values.push(command[3]);
 						res.end('success');
 					} else if(command[2] == 'delete') {						
 						if(command[3] == 'top') {
 							db.remove(db.getRegistered()[0]);
 							res.end('success');
-						} else if(command[3] == 'bottom') {
+						} else if(command[3] == 'bottom') { ////--
 							db.remove(db.getRegistered()[db.getRegistered().length-1]);
+							console.log('????');
+							console.log(db.find({
+								id:'00754548'
+							}));
 							res.end('success');
 						} else {
-							res.end('ERR: Invalid event action.');
+							res.end('Invalid event action.');
 						}
 					} else {
-						res.end('ERR: Invalid event action.');
+						res.end('Invalid event action.');
 					}
 				} else {
-					res.end('ERR: Invalid command.');
+					res.end('Invalid command.');
 				}
 			});
 		} else {
-			console.log('ERR: Invalid request.');
+			console.log('Invalid request.');
 		}
 	} else {
 		fs.readFile(__dirname+path,function(err,data) {
@@ -376,19 +344,10 @@ function parseBarcode(code) {
 	}
 };
 
-function exportDB(type,fname,callback) {
-	if(typeof fname == 'function' && !callback) {
-		callback = fname;
-		fname = null;
-	}
-
-	if(!fname) {
-		fname = 'db.xlsx';
-	}
-
-	if(type == 'excel' || !type) {
-		if(fs.existsSync(fname)) {
-			fs.unlink(fname,function(err) {
+function exportDB(type,callback) {
+	if(type == 'excel') {
+		if(fs.existsSync('db.xlsx')) {
+			fs.unlink('db.xlsx',function(err) {
 				if(err) {
 					return console.log(err);
 				}
@@ -415,7 +374,7 @@ function exportDB(type,fname,callback) {
 			}
 		}
 
-		xlsx.write(fname,data,function(err) {
+		xlsx.write('db.xlsx',data,function(err) {
 			if(err) {
 				return console.log(err);
 			}

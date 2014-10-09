@@ -260,12 +260,19 @@ window.addEventListener('load',function() {
 							var student = JSON.parse(this.responseText);
 							
 							sid.state = 2;
-							stats.total++;
 
 							if(student.registered) {
-								sid.value = 'Welcome, '+student.fname+' '+student.lname;
+								if(student.alreadyRegistered) {
+									sid.value = 'Welc... oh, you again?';
+									sid.error('You cannot register more than once per event.');
+								} else {
+									stats.total++;
+									sid.value = 'Welcome, '+student.fname+' '+student.lname;
+
+									sid.write('There are now a total of '+stats.total+' people at this event.');
+								}
 							} else {
-								sid.write('You must be new here!');
+								sid.write('"You must be new here..." --Gene Wilder');
 
 								sid.value = '';
 								sid.placeholder = 'Enter your name to continue...';

@@ -211,19 +211,17 @@ var server = http.createServer(function(req,res) {
 					var entry = db.get(name[0].index);
 
 					if(db.isRegistered(entry)) {
-						response.registered = true;
 						response.alreadyRegistered = true;
 					} else {
-						console.log("test");
 						entry.visits++;
 						entry.events += (db.global_values[0] || db.global_date)+',';
 
 						db.register(name[0]);
-
-						response.fname = name[0].fname;
-						response.lname = name[0].lname;
-						response.registered = true;
 					}
+
+					response.fname = name[0].fname;
+					response.lname = name[0].lname;
+					response.registered = true;
 				} else {
 					response.registered = false;
 				}

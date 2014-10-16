@@ -396,8 +396,11 @@ function exportDB(type,fname,callback) {
 
 		var data = [];
 		var entry = {};
+		var eventNum = 0;
+
 		for(var i=0;i<db.size();i++) {
 			entry = db.get(i);
+
 			if(!entry.deleted) {
 				data.push({
 					'ID':entry.id,
@@ -410,7 +413,22 @@ function exportDB(type,fname,callback) {
 					'EVENTS':entry.events
 				});
 			}
+
+			if(entry.events) {
+				eventNum++;
+			}
 		}
+
+		data.push({
+			'ID':' ',
+			'LAST':' ',
+			'FIRST':' ',
+			'STUCLASS_DESC':' ',
+			'MAJR1':' ',
+			'EMAIL':' ',
+			'VISITS':(""+eventNum+""),
+			'EVENTS':' '
+		});
 
 		xlsx.write(fname,data,function(err) {
 			if(err) {

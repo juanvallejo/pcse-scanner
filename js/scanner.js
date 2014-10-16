@@ -5,17 +5,24 @@
 * @file scanner.js
 *
 * @author juanvallejo
-* @date 10/7/14
+* @date 10/15/14
 *
-* Canvas animation library. Consists of three separate 'method modules' that define methods specific
-* to the Lib object, spritesheet objects, canvas line objects, and canvas rectangle objects.
-* Such events are separated for modularity and readability in one file. Shared methods are functions that
-* are general enough to apply to all three types of Lib.js objects.
+* Scanner application 'server'. Handles all data processing and i/o.
+* Reads data from a local mysql database, builds an internal structure
+* with it, and allows for easy manipulation of it. Outputs to .xlsx file.
 *
 * Note: Include important notes on program here.
 *
-* Important: Include anything needed to run / dependencies required here.
+* Important: Requires the following dependencies / node.js packages:
+*
+*		- csv 	-> npm install fast-csv
+* 		- excel -> npm install excel
+* 		- mysql	-> npm install mysql
+* 		- xlsx 	-> npm install xlsx-writer
 */
+
+var SERVER_PORT 		= 8000;								// port at which to have server listen for connections
+var EXCEL_OUTPUT_NAME 	= 'db.xlsx';						// define name of output spreadsheet file (will be replaced) if it exists
 
 /**
  * define node.js libraries and dependencies
@@ -25,6 +32,72 @@ var http 	= require('http');
 var excel 	= require('excel');
 var xlsx 	= require('xlsx-writer');
 var csv 	= require('fast-csv');
+
+/**
+ * define stdin variables and settings used in the command line
+ * interface part of the program, as well as global flags and 
+ * varying settings used in the general application.
+**/
+var stdin = process.stdin;									// grabs all keyboard input
+var value = '';												// buffer containing individual input entered into command line
+var ready = false;											// Specifies whether value 'buffer' is ready to be parsed. Also
+															// used by spreadsheet parser function to indicate contents of file
+															// have been read and have been added to the database object
+
+// set stdinp to treat all keyboard input as 'raw' input
+stdin.setRawMode(true);
+
+// set character encoding for keyboard input
+process.stdin.setEncoding('utf8');
+
+/**
+ * listens for data input from keyboard and
+ * parses it by checking input against database.
+ *
+ * @event data
+**/
+stdin.on('data',function(key) {
+	if(key =='\3') {
+		process.exit();
+	} else if(key == '\r') {
+		if(ready) {
+			var command = value.split('/');
+			if(command[1] == 'export') {
+				if(command[2] == 'excel') {
+					exportDB();
+				} else if(command[2] == 'csv') {
+					console.log('Please use the graphical interface to interact with this command.');
+				}
+			} else {
+				parseBarcode(value);
+			}
+			value = '';
+		} else {
+			console.log('The database must be loaded before any input can be processed.');
+		}
+	} else {
+		value += key;
+	}
+});
+
+/**
+ * Matches passed string of numbers against ids in
+ * database and emits a console response accordingly
+ *
+ * @param code = {String} of numbers containing a student id
+**/
+function parseBarcode(code) {
+	code = code.substring(2);
+	var search = db.find({
+		id:code
+	});
+
+	if(search.length) {
+		console.log('Welcome back, '+search[0].fname+' '+search[0].lname+'!');
+	} else {
+		console.log('You must be new here... ('+code+')');
+	}
+};
 
 /**
  * define mysql connection object
@@ -39,7 +112,15 @@ var mysql = {
 	// holds the connection object to the mysql server or null if not connected
 	connection: null,
 
-	// creates and establishes a connection to the mysql server
+	/**
+	 * creates and establishes a connection to
+	 * the mysql server
+	 *
+	 * @param host 		= {String} specifying mysql server address
+	 * @param user		= {String} specifying database account username
+	 * @param password	= {String} specifying database account password
+	 * @param database 	= {String} specifying the name of database to connect to
+	**/
 	connect: function(host, user, password, database) {
 		if(!mysql.isConnected || (host && user && password)) {
 			// create connection blueprint
@@ -74,7 +155,9 @@ var mysql = {
 		}
 	},
 
-	//safely close the mysql connection
+	/**
+	 * safely closes the mysql connection
+	**/
 	end:function() {
 		if(mysql.isConnected) {
 			// reset our flag to indicate no connection exists
@@ -87,14 +170,8 @@ var mysql = {
 };
 
 /**
- * define variables required for command line interface
-**/
-var mode = 1;
-var value = '';
-var ready = false;
-
-/**
  * define file extensions and their associated 'content' mime type
+ * to be served back to the client
 **/
 var mimes = {
 	'js':'application/javascript',
@@ -124,35 +201,51 @@ var db = {
 	raw_data:[],
 	last_reg:[],
 	last_new_reg:[],
-	global_values:[], 								//global_values[0] holds company name data
+	global_values:[], 									//global_values[0] holds company name data
 	global_date:'0/0/0000',
 	add:function(entry) {
-		db.raw_data.push(entry);
-		db.entries.push({
-			index:db.entries.length,
-			id:entry[0],
-			fname:entry[2],
-			lname:entry[1],
-			year:entry[3],
-			major:entry[4],
-			email:entry[5],
-			visits:entry[6] == ' ' ? 0 : parseInt(entry[6]),
-			events:(!entry[7]) ? '' : entry[7],
-			deleted:false
-		});
+		if(entry instanceof Array) {
+			db.raw_data.push(entry);
+			db.entries.push({
+				index:db.entries.length,
+				id:entry[0],
+				fname:entry[2],
+				lname:entry[1],
+				year:entry[3],
+				major:entry[4],
+				email:entry[5],
+				visits:entry[6] == ' ' ? 0 : parseInt(entry[6]),
+				events:(!entry[7]) ? '' : entry[7],
+				deleted:false
+			});
+		} else {
+			db.entries.push({
+				index:db.entries.length,
+				id:entry.student_id,
+				fname:entry.first,
+				lname:entry.last,
+				year:entry.year,
+				major:entry.major,
+				email:entry.email,
+				visits:0,
+				events:'',
+				deleted:false
+			});
+		}
 
 		return db.entries[db.entries.length-1];
 	},
 
 	/**
-	 * Loops through each database 'entry' and calls function passing
-	 * current entry and its index as parameters
+	 * Loops through each database 'entry' and calls parameter function,
+	 * passing current entry and its index as parameters
 	 *
 	 * @param callback = {Function} to call on every iteration
 	**/
 	forEach:function(callback) {
 		for(var i=0;i<db.size();i++) {
-			// call the passed function for every item in 'database'
+			// call the passed function for every item in 'database' where 'db'
+			// is the scope, 'db.get(i)' is the entry and 'i' is the current index
 			callback.call(db, db.get(i), i);
 		}
 	},
@@ -242,50 +335,14 @@ var db = {
 	}
 };
 
-parseDB(function() {
-	var date = new Date();
-	db.global_date = date.getMonth()+'/'+date.getDate()+'/'+date.getFullYear();
-
-	var autosave = (function auto_save_process() {
-		exportDB('excel','db_autosave.xlsx',function(err) {
-			if(err) {
-				return console.log('There was an error auto-saving to the database: '+err);
-			}
-
-			console.log('The database has been auto-saved');
-			setTimeout(auto_save_process,(1000*60));
-		});
-	})();
-});
-
-var stdin = process.stdin;
-process.stdin.setEncoding('utf8');
-stdin.setRawMode(true);
-stdin.on('data',function(key) {
-	if(key =='\3') {
-		process.exit();
-	} else if(key == '\r') {
-		if(ready) {
-			var command = value.split('/');
-			if(command[1] == 'export') {
-				if(command[2] == 'excel') {
-					exportDB();
-				} else if(command[2] == 'csv') {
-					console.log('Please use the graphical interface to interact with this command.');
-				}
-			} else {
-				parseBarcode(value);
-			}
-			value = '';
-		} else {
-			console.log('The database must be loaded before any input can be processed.');
-		}
-	} else {
-		value += key;
-	}
-});
-
-var server = http.createServer(function(req,res) {
+/**
+ * Creates an http server and serves a static 'index.html' file
+ * back to the client. Listens for 'API calls' from the client and 
+ * serves back database information accordingly.
+ *
+ * Listens at address: http://localhost:{SERVER_PORT}/
+ **/
+http.createServer(function(req, res) {
 	var path = routes[req.url] || req.url;
 
 	if(path == '/register') {
@@ -446,25 +503,94 @@ var server = http.createServer(function(req,res) {
 			res.end(data);
 		});
 	}
-}).listen(8000);
+}).listen(SERVER_PORT);
 
-function parseDB(callback) {
-	if(fs.existsSync('db.xlsx')) {
-		excel('db.xlsx',function(err,data) {
+/**
+ * Main function. Initializes program by fetching data from mysql
+ * database, in order, by last_name ascending and populating db
+ * object with it. Autoruns on program start.
+**/
+(function main() {
+	// begin adding to internal database object
+	populateDatabaseFromMysql(function() {
+		var date = new Date();
+		db.global_date = date.getMonth() + '/' + date.getDate() + '/'+date.getFullYear();
+
+		var autosave = (function auto_save_process() {
+			exportDB('excel','db_autosave.xlsx',function(err) {
+				if(err) {
+					return console.log('There was an error auto-saving to the database: '+err);
+				}
+
+				// log that the database has been auto-save
+				console.log('The database has been auto-saved');
+
+				// call auto_save function every minute
+				setTimeout(auto_save_process, (1000*60));
+			});
+		})();
+	});
+})();
+
+/**
+ * Checks that EXCEL_OUTPUT_NAME file exists and reads all fields from it.
+ * When file is parsed, it populates the 'db' object with data from its rows.
+ *
+ * @param callback = {Function} to be called when mysql database query is complete.
+**/
+function populateDatabaseFromMysql(callback) {
+	// issue query to get all fields from `students` in ascending order by last name
+	mysql.connect().query('SELECT * FROM students ORDER BY last ASC', function(err, rows, fields) {
+		// check for errors
+		if(err) {
+			// return and log error if found
+			return console.log('There was an error parsing database fetch request. -> '+err);
+		}
+
+		// iterate through rows array and add each row object to the database
+		rows.forEach(function(row, index) {
+			db.add(row);
+		});
+
+		//call passed callback function
+		callback.call();
+	});
+}
+
+/**
+ * Checks that EXCEL_OUTPUT_NAME file exists and reads all fields from it.
+ * When file is parsed, it populates the 'db' object with data from its rows.
+ *
+ * @param callback = {Function} to be called when excel sheet is done being read.
+**/
+function populateDatabaseFromSpreadsheet(callback) {
+	// checks if file exists
+	if(fs.existsSync(EXCEL_OUTPUT_NAME)) {
+		// use excel package to read spreadsheet file
+		excel(EXCEL_OUTPUT_NAME, function(err,data) {
 			if(err) {
-				console.log('Error reading database document.');
-				return console.log(err);
+				// exit function and log error message to database.
+				return console.log('Error reading database document. -> '+err);
 			}
 
-			for(var i=1;i<data.length;i++) {
+			// loop through and add all rows (as arrays) from file to database
+			for(var i = 1; i < data.length; i++) {
 				db.add(data[i]);
 			}
 
-			if(typeof callback == 'function') callback.call(this);
+			// if callback function, call it with general context
+			if(typeof callback == 'function') {
+				callback.call(this);
+			}
 
+			// tell application, database has been populated
+			// from the spreadsheet file.
 			ready = true;
+
+			// add plain array from file as backup data to database.
 			db.setRawData(data);
 
+			// Log to database that database has been populated and app is ready.
 			console.log('Database loaded. Waiting for scanner...');
 		});
 	} else {
@@ -472,27 +598,15 @@ function parseDB(callback) {
 	}
 };
 
-function parseBarcode(code) {
-	code = code.substring(2);
-	var search = db.find({
-		id:code
-	});
-
-	if(search.length) {
-		console.log('Welcome back, '+search[0].fname+' '+search[0].lname+'!');
-	} else {
-		console.log('You must be new here... ('+code+')');
-	}
-};
-
-function exportDB(type,fname,callback) {
+function exportDB(type, fname, callback) {
 	if(typeof fname == 'function' && !callback) {
 		callback = fname;
 		fname = null;
 	}
 
 	if(!fname) {
-		fname = 'db.xlsx';
+		// define output file from global setting if none is given
+		fname = EXCEL_OUTPUT_NAME;
 	}
 
 	if(type == 'excel' || !type) {
@@ -506,24 +620,27 @@ function exportDB(type,fname,callback) {
 			});
 		}
 
-		var data = [];
-		var entry = {};
-		for(var i=0;i<db.size();i++) {
-			entry = db.get(i);
+		var data = [];											// array of 'entry' objects containing student information
+																// to be used with xlsx function to output data to spreadsheet
+
+		db.forEach(function(entry, index) {
+			// only add entry to data array if it hasn't been 'removed'
 			if(!entry.deleted) {
+
 				data.push({
-					'ID':entry.id,
-					'LAST':entry.lname,
-					'FIRST':entry.fname,
-					'STUCLASS_DESC':entry.year,
-					'MAJR1':entry.major,
-					'EMAIL':entry.email,
-					'VISITS':(""+entry.visits+""),
-					'EVENTS':entry.events
+					'ID'			:entry.id,					// contains student id as a string
+					'LAST'			:entry.lname,				// contains student's last name
+					'FIRST'			:entry.fname,				// contains student's first name
+					'STUCLASS_DESC' :entry.year,				// contains student's class (freshman .. senior)
+					'MAJR1'			:entry.major,				// contains student's area of study
+					'EMAIL'			:entry.email,				// contains student's school email
+					'VISITS'		:(""+entry.visits+""),		// add quotes to make sure value is treated as String, not Integer
+					'EVENTS'		:entry.events 				// string containing event name (followed by current date and a comma)
 				});
 			}
-		}
+		});
 
+		// write all objects in data array to created spreadsheet
 		xlsx.write(fname,data,function(err) {
 			if(err) {
 				return console.log(err);

@@ -1,13 +1,101 @@
-var fs = require('fs');
-var http = require('http');
-var excel = require('excel');
-var xlsx = require('xlsx-writer');
-var csv = require('fast-csv');
+/**
+* Provided under the MIT License (c) 2014
+* See LICENSE @file for details.
+*
+* @file scanner.js
+*
+* @author juanvallejo
+* @date 10/7/14
+*
+* Canvas animation library. Consists of three separate 'method modules' that define methods specific
+* to the Lib object, spritesheet objects, canvas line objects, and canvas rectangle objects.
+* Such events are separated for modularity and readability in one file. Shared methods are functions that
+* are general enough to apply to all three types of Lib.js objects.
+*
+* Note: Include important notes on program here.
+*
+* Important: Include anything needed to run / dependencies required here.
+*/
 
+/**
+ * define node.js libraries and dependencies
+**/
+var fs 		= require('fs');
+var http 	= require('http');
+var excel 	= require('excel');
+var xlsx 	= require('xlsx-writer');
+var csv 	= require('fast-csv');
+
+/**
+ * define mysql connection object
+**/
+var mysql = {
+	// define and import node.js package
+	library: require('mysql'),
+
+	// flag indicating whether a connection to mysql server has been established
+	isConnected:false,
+
+	// holds the connection object to the mysql server or null if not connected
+	connection: null,
+
+	// creates and establishes a connection to the mysql server
+	connect: function(host, user, password, database) {
+		if(!mysql.isConnected || (host && user && password)) {
+			// create connection blueprint
+			mysql.connection = mysql.library.createConnection({
+				host: 			host || 'localhost',
+				user: 			user || 'root',
+				pass: 		password || '',
+				database: 	database || 'pizza_my_mind'
+			});
+
+			// create connection to server
+			mysql.connection.connect(function(err) {
+				// check to see if connection was successful
+				if(err) {
+					console.log('Error establishing a connection to the mysql server -> '+err);
+
+					return;
+				}
+
+				console.log('successfully connected to mysql server');
+			});
+
+			// tell connection flag that connection was successful
+			mysql.isConnected = true;
+
+			// if new connection @params are given, or there is no previous connection,
+			// create one and return it
+			return mysql.connection;
+		} else {
+			// return existing connection to the database
+			return mysql.connection;
+		}
+	},
+
+	//safely close the mysql connection
+	end:function() {
+		if(mysql.isConnected) {
+			// reset our flag to indicate no connection exists
+			mysql.isConnected = false;
+
+			// send close packet to server
+			mysql.connection.end();
+		}
+	}
+};
+
+/**
+ * define variables required for command line interface
+**/
 var mode = 1;
 var value = '';
 var ready = false;
 
+/**
+ * define file extensions and their associated 'content' mime type
+**/
 var mimes = {
 	'js':'application/javascript',
 	'html':'text/html',
@@ -20,16 +108,23 @@ var mimes = {
 	'gif':'image/gif'
 };
 
+/**
+ * reroutes defined keys to their assigned destination
+**/
 var routes = {
 	'/':'/index.html'
 };
 
+/**
+ * define main database object used to hold, add, and handle data
+ * entries from spreadsheet
+**/
 var db = {
 	entries:[],
 	raw_data:[],
 	last_reg:[],
 	last_new_reg:[],
-	global_values:[], //global_values[0] holds company name data
+	global_values:[], 								//global_values[0] holds company name data
 	global_date:'0/0/0000',
 	add:function(entry) {
 		db.raw_data.push(entry);
@@ -47,6 +142,19 @@ var db = {
 		});
 
 		return db.entries[db.entries.length-1];
+	},
+
+	/**
+	 * Loops through each database 'entry' and calls function passing
+	 * current entry and its index as parameters
+	 *
+	 * @param callback = {Function} to call on every iteration
+	**/
+	forEach:function(callback) {
+		for(var i=0;i<db.size();i++) {
+			// call the passed function for every item in 'database'
+			callback.call(db, db.get(i), i);
+		}
 	},
 	get:function(index) {
 		return db.entries[index];
@@ -283,7 +391,11 @@ var server = http.createServer(function(req,res) {
 				value += chunk;
 			});
 			req.on('end',function() {
-				var command = value.split('/');
+				// split command string into sub-commands
+				var command = value.split('/');					// [1] -> target / object to apply the command to
+																// [2] -> action to apply to target
+																// [3] -> data to use when applying action to target
+
 				if(command[1] == 'export') {
 					exportDB(command[2],function(err) {
 						if(err) {
@@ -450,6 +562,22 @@ function exportDB(type,fname,callback) {
 		}
 
 		stream.end();
+	} else if(type == 'mysql') {
+		// connect to mysql server and export data from db object to it
+		db.forEach(function(entry, index) {
+			// iterate through each 'entry' and input its data as rows into the database
+			mysql.connect()
+				.query('INSERT INTO students(student_id, last, first, year, major, email) VALUES ("' +
+					entry.id 	+ '", "' +
+					entry.lname + '", "' +
+					entry.fname + '", "' +
+					entry.year 	+ '", "' + 
+					entry.major + '", "' +
+					entry.email + '")'
+				);
+		});
+
+		console.log('successfully exported data to the mysql server.');
 	} else {
 		var err = 'exportDB error: Invalid type.';
 		callback.call(this,err)

@@ -82,7 +82,9 @@ window.addEventListener('load', function() {
 	//focus the main input element
 	sid.focus();
 
-	sid.state = 1;
+	sid.state = 1;										// 
+	sid.dataState = null;								// (null, 0 ... 4) initialize dataState flag, used in 'registration'
+														// process of a new entry to indicate which data to prompt the user for.
 
 	/**
 	 * Writes passed 'error message' to 'out' html element, or default
@@ -134,6 +136,7 @@ window.addEventListener('load', function() {
 	 */
 	sid.addEventListener('keydown', function(e) {
 		if(e.keyCode == 13) {
+			// if enter key is pressed
 			sid.write('');
 
 			if(sid.value == "") {
@@ -299,51 +302,150 @@ window.addEventListener('load', function() {
 					});
 				}
 			} else {
-				if((!sid.reg && sid.value.match(/[0-9]{8}/gi)) || (sid.reg && sid.value.match(/^[a-z]+(\ )[a-z]+/gi))) {
-					var data = "sid="+sid.value.substring(2);
-					var uri = '/register';
+				// if the registering-new-student 'reg' property is set on the input and value matches a string,
+				// or if there is no 'reg' property set and the value matches a number (for a student id), continue
+				if((!sid.reg && sid.value.match(/[0-9]{8}/gi)) || (sid.reg && sid.dataState != null)) {
+					// if the 'register' flag is set, meaning we want to add a new entry and
+					// that a dataState exists
+					if(sid.reg && sid.dataState) {
+						// check which 'input' stage the new user is on
+						if(sid.dataState == 1) {
+							// check to see that a first and last name are entered
+							if(sid.value.match(/^[a-z]+(\ )[a-z]+/gi)) {
+								// collect stuname and move on to next data state
+								sid.dataState = 2;
 
-					if(sid.reg) {
-						data = "sid="+sid.sid+"&name="+sid.value;
-						uri = '/register/new';
+								// parse first and last name from sid.value by splitting by spaces
+								// and assigning values to sid.fname and sid.lname respectively
+								sid.fname = sid.value.split(' ')[0];
+								sid.lname = sid.value.split(' ')[1];
 
-						sid.reg = false;
-						sid.sid = null;
-						sid.placeholder = 'Type your ID to continue...';
+								// prompt student to enter the next dataState value (year)
+								sid.placeholder = 'Enter your year to continue...';
 
-						stats.registered++;
-					}
-
-					var xhr = new XMLHttpRequest();
-					xhr.open('POST',uri,true);
-					xhr.send(data);
-					xhr.addEventListener('readystatechange',function() {
-						if(this.readyState == 4 && this.status == 200) {
-							var student = JSON.parse(this.responseText);
-							
-							sid.state = 2;
-
-							if(student.registered) {
-								if(student.alreadyRegistered) {
-									sid.value = 'Welc... oh, you again?';
-									sid.error('You cannot register more than once per event.');
-								} else {
-									stats.total++;
-									sid.value = 'Welcome, '+student.fname+' '+student.lname;
-
-									sid.write('There are now a total of '+stats.total+' people at this event.');
-								}
-							} else {
-								sid.write('"You must be new here..." --Gene Wilder');
-
+								// reset input value
 								sid.value = '';
-								sid.placeholder = 'Enter your name to continue...';
-								sid.state = 3;
-								sid.reg = true;
-								sid.sid = student.id;
+
+							} else {
+								// if an invalid name is entered, 
+								sid.error('Please enter a valid name.');
 							}
+						} else if(sid.dataState == 2) {
+							// collect year and move on to next data state
+							sid.dataState = 3;
+
+							// set sid.year to current sid value to save entered value (year)
+							sid.year = sid.value;
+
+							// prompt student to enter the next dataState value (major)
+							sid.placeholder = 'Please enter your major...';
+
+							// reset input value
+							sid.value = '';
+
+						} else if(sid.dataState == 3) {
+							// collect 'major' and set dataState flag to 0. This tells the program
+							// that the registration process is ending and must be reset.
+							sid.dataState = 0;
+
+							// set sid.major to current sid value to save entered value (major)
+							sid.major = sid.value;
+
+							// prompt student to enter the next dataState value (email)
+							sid.placeholder = 'Finally, enter your email to sign in...';
+
+							// reset input value
+							sid.value = '';
 						}
-					});
+
+					} else {
+						// store data to be sent as post request to server containing
+						// entry information such as name, id, major, etc.
+						var data = "id=" + sid.value.substring(2);
+
+						// default uri for logging already existing entries
+						var uri = '/register';
+
+						// if the 'reg' flag is set, but there is no dataState flag, or the dataState
+						// flag is 0, this indicates the registration process has ended and must be reset.
+						if(sid.reg && !sid.dataState) {
+							// set sid.email to current sid value to save entered value (email)
+							sid.email = sid.value;
+
+							// advertise that registration process is over for new entry
+							sid.placeholder = 'Thanks ' + sid.stuname + ', you have been signed in.';
+
+							// reset input value
+							sid.value = '';
+
+							// format outgoing data string with new student information
+							data = 	'id='		+ sid.sid 		+ 			// contains student id
+									'&fname=' 	+ sid.fname 	+ 			// contains student first name
+									'&lname='	+ sid.lname		+			// contains student last name
+									'&year=' 	+ sid.year 		+			// contains student year
+									'&major='	+ sid.major		+			// contains student major
+									'&email='	+ sid.email 	;			// contains student email
+
+							// update api request to register entry as new
+							uri = '/register/new';
+
+							// reset 'reg' flag to end registration mode and clear the 'sid' field of our input field object
+							sid.reg = false;
+							sid.sid = null;
+
+							// clear dataState flag to indicate no registration prompt is going to be shown
+							sid.dataState = null;
+
+							// if information is entered successfully, update registrant counter
+							stats.registered++;
+						}
+
+						// if program is no longer in 'registration' mode, send new data to the server
+						var xhr = new XMLHttpRequest();
+						xhr.open('POST', uri, true);
+						xhr.send(data);
+						xhr.addEventListener('readystatechange',function() {
+							if(this.readyState == 4 && this.status == 200) {
+								var student = JSON.parse(this.responseText);
+								
+								sid.state = 2;									// state of 2 tells input field to reset its value
+
+								// if the entry exists in the server 'database'
+								if(student.registered) {
+									// check if the entry has already been updated with the server
+									if(student.alreadyRegistered) {
+										// output message to the input field
+										sid.value = 'Welc... oh, you again?';
+
+										// output message to the interface console
+										sid.error('You cannot register more than once per event.');
+									} else {
+										// update the counter of total people signed in
+										stats.total++;
+
+										// output welcome message to the input field
+										sid.value = 'Welcome, ' + student.fname + ' ' + student.lname;
+
+										sid.write('There are now a total of '+stats.total+' people at this event.');
+									}
+								} else {
+
+									sid.value 		= '';						// reset our input value
+									sid.placeholder = 							// sets input with instructions for user
+									
+										'Enter your name to continue...';
+
+									sid.state 		= 3;						// state of '3' tells input field to reset its value
+									sid.dataState 	= 1;
+									sid.reg 		= true;						// tell app it is now in 'registration' mode
+									sid.sid 		= student.id; 				// store student id in our main input field object
+
+									// output registration message to the interface console
+									sid.write('"You must be new here..." --Gene Wilder');
+								}
+							}
+						});
+					}
 				} else {
 					if(!sid.reg) {
 						sid.write('Please enter a valid student ID.');
@@ -363,9 +465,12 @@ window.addEventListener('load', function() {
 			}
 		} else {
 			if(sid.state == 2) {
+				// change input value type from 
 				sid.state = 1;
 				sid.value = '';
 			} else if(sid.state == 3) {
+				// clear student id input and set current input value
+				// type to accept student's name
 				sid.state = 1;
 				sid.value = '';
 			}			

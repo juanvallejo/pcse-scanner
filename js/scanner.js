@@ -352,7 +352,7 @@ http.createServer(function(req, res) {
 				value += chunk;
 			});
 			req.on('end',function() {
-				var id = value.split('sid=')[1];
+				var id = value.split('id=')[1];
 				
 				var name = db.find({
 					id:id
@@ -404,37 +404,52 @@ http.createServer(function(req, res) {
 				value += chunk;
 			});
 			req.on('end',function() {
-				var id = '00'+value.split('sid=')[1];
-				var name = id.split('&name=')[1].split(' ');
-				id = id.split('&name=')[0];
+				var entry 	= {};									// create a new entry object with fields passed from client
+				var values 	= value.split('&');						// create array of key-value pairs of passed data
 
-				if(name) {
-					console.log('Registering '+name+' with ID '+id);
-				}
+				// create response object
+				var response = {};
 
-				db.registerNew(id);
+				// format key-value pair and add to object 'entry'
+				values.forEach(function(item, index) {
+					// split value pair into key and value and save array
+					var valuePair = item.split('=');
 
+					// add key-value pair to entry object
+					entry[valuePair[0]] = valuePair[1];
+				});
+
+				// format the entry id to include two 0's in front of number to match database format
+				entry.id = '00' + entry.id;
+
+				// #todo change format of name in client side
+				console.log('Registering \'' + entry.fname + ' ' + entry.lname + '\' with ID ' + entry.id);
+
+				// add entry id to list of registered entries
+				db.registerNew(entry.id);
+
+				// create array object and push to database
 				db.add([
-					id,
-					name[1],
-					name[0],
-					'N/A',
-					'N/A',
-					'N/A',
+					entry.id,
+					entry.lname,
+					entry.fname,
+					entry.year,
+					entry.major,
+					entry.email,
 					'1',
-					(db.global_values[0] || db.global_date)+','
+					(db.global_values[0] || db.global_date) + ','
 				]);
 
-				var response = {
-					id:id
-				};
+				//return entry id in response object
+				response.id = entry.id;
 
-				if(name.length > 0) {
-					response.fname = name[0];
-					response.lname = name[1];
+				if(entry.fname) {
+					response.fname = entry.fname;
+					response.lname = entry.lname;
 					response.registered = true;
 				} else {
 					response.registered = false;
+					response.registerError = true;
 				}
 
 				res.end(JSON.stringify(response));

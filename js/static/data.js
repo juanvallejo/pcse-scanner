@@ -373,7 +373,7 @@ window.addEventListener('load', function() {
 							sid.email = sid.value;
 
 							// advertise that registration process is over for new entry
-							sid.placeholder = 'Thanks ' + sid.stuname + ', you have been signed in.';
+							sid.placeholder = 'Thanks ' + sid.fname + ', you\'ve been signed in.';
 
 							// reset input value
 							sid.value = '';

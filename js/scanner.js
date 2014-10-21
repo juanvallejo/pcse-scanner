@@ -11,7 +11,7 @@
 * Reads data from a local mysql database, builds an internal structure
 * with it, and allows for easy manipulation of it. Outputs to .xlsx file.
 *
-* Note: Include important notes on program here.
+* Note: @callback_params are parameters passed to a callback function
 *
 * Important: Requires the following dependencies / node.js packages:
 *
@@ -21,8 +21,18 @@
 * 		- xlsx 	-> npm install xlsx-writer
 */
 
+// define server constants
 var SERVER_PORT 		= 8000;								// port at which to have server listen for connections
-var EXCEL_OUTPUT_NAME 	= 'db.xlsx';						// define name of output spreadsheet file (will be replaced) if it exists
+
+// define excel output and input filenames
+var EXCEL_OUTPUT_FILE 	= 'db.xlsx';						// define name of output spreadsheet file (will be replaced) if it exists
+var EXCEL_AUTOSAVE_FILE	= 'db_autosave.xlsx';				// defines filename used to export autosaved backups of database entries
+
+// define default mysql constants
+var MYSQL_DEFAULT_HOST 	= 'localhost';						// define address of mysql server
+var MYSQL_DEFAULT_PASS	= '';								// define password for mysql server
+var MYSQL_DEFAULT_DB 	= 'pizza_my_mind';					// define default mysql database name
+var MYSQL_DEFAULT_USER	= 'root';							// define username for mysql server
 
 /**
  * define node.js libraries and dependencies
@@ -38,6 +48,7 @@ var csv 	= require('fast-csv');
  * interface part of the program, as well as global flags and 
  * varying settings used in the general application.
 **/
+var global_date = '0_0_0000';								// holds global date property for program
 var stdin = process.stdin;									// grabs all keyboard input
 var value = '';												// buffer containing individual input entered into command line
 var ready = false;											// Specifies whether value 'buffer' is ready to be parsed. Also
@@ -64,7 +75,7 @@ stdin.on('data',function(key) {
 			var command = value.split('/');
 			if(command[1] == 'export') {
 				if(command[2] == 'excel') {
-					exportDB();
+					exportDatabase();
 				} else if(command[2] == 'csv') {
 					console.log('Please use the graphical interface to interact with this command.');
 				}
@@ -88,7 +99,7 @@ stdin.on('data',function(key) {
 **/
 function parseBarcode(code) {
 	code = code.substring(2);
-	var search = db.find({
+	var search = database.find({
 		id:code
 	});
 
@@ -103,14 +114,16 @@ function parseBarcode(code) {
  * define mysql connection object
 **/
 var mysql = {
-	// define and import node.js package
-	library: require('mysql'),
+	// define mysql object properties
+	connection 			: 	null,				// holds the connection object to the mysql server or null if not connected
+	eventTableCreated	: 	false,				// flag indicating whether a mysql table has been created for current event
+	hasData				:	false,				// flag indicating whether mysql database table contains any data
+	isBusy 				: 	false, 				// flag indicating whether a mysql query is currently ongoing
+	isConnected			: 	false,				// flag indicating whether a connection to mysql server has been established
+	library				: 	require('mysql'),	// define and import node.js package
 
-	// flag indicating whether a connection to mysql server has been established
-	isConnected:false,
-
-	// holds the connection object to the mysql server or null if not connected
-	connection: null,
+	// define name of mysql table to hold data for current event
+	eventTableName		: 	global_date,
 
 	/**
 	 * creates and establishes a connection to
@@ -122,13 +135,14 @@ var mysql = {
 	 * @param database 	= {String} specifying the name of database to connect to
 	**/
 	connect: function(host, user, password, database) {
+		// check to see if previous connection exists, or @params for new connection are passed
 		if(!mysql.isConnected || (host && user && password)) {
 			// create connection blueprint
 			mysql.connection = mysql.library.createConnection({
-				host: 			host || 'localhost',
-				user: 			user || 'root',
-				pass: 		password || '',
-				database: 	database || 'pizza_my_mind'
+				host: 			host || MYSQL_DEFAULT_HOST,
+				user: 			user || MYSQL_DEFAULT_USER,
+				pass: 		password || MYSQL_DEFAULT_PASS,
+				database: 	database || MYSQL_DEFAULT_DB
 			});
 
 			// create connection to server
@@ -166,6 +180,205 @@ var mysql = {
 			// send close packet to server
 			mysql.connection.end();
 		}
+	},
+
+	/**
+	 * inserts new entry to mysql database
+	 *
+	 * @param mysqlTableName  	= {Object}		entry object from local 'database' object
+	 * @param databaseColumns 	= {Array} 		containing names of mysql table columns to insert values into
+	 * @param valuesToAdd		= {Array} 		containing entry values to add
+	 * @param callback 			= {Function} 	to call after operation has completed successfully
+	**/
+	insertInto:function(mysqlTableName, databaseColumns, valuesToAdd, callback) {
+		// our values to add have to be in quotes. Add them to each value on the list
+		valuesToAdd.forEach(function(value, index) {
+			valuesToAdd[index] = '"' + value + '"';
+		});
+
+		// join arrays of column names and values to add by commas and add them to our query string
+		mysql.connect()
+			.query('INSERT INTO ' + mysqlTableName + '(' + (databaseColumns.join(',')) + ') VALUES (' + valuesToAdd.join(',') + ')', 
+				// call user's callback function
+				function(err) {
+					// get err param if any and pass it to callback before calling
+					callback.call(mysql, err);
+				});
+	}
+};
+
+/**
+ * define main database object used to hold, add, and handle data
+ * entries from spreadsheet
+**/
+var database = {
+	entries:[],
+	raw_data:[],
+	last_reg:[],
+	last_new_reg:[],
+	global_values:[], 									//global_values[0] holds company name data
+
+	add:function(entry) {
+		// if we are passed an array of arrays, assume data came from parsing an excel spreadsheet
+		if(entry instanceof Array) {
+			database.raw_data.push(entry);
+			database.entries.push({
+				index:database.entries.length,
+				id:entry[0],
+				fname:entry[2],
+				lname:entry[1],
+				year:entry[3],
+				major:entry[4],
+				email:entry[5],
+				visits:entry[6] == ' ' ? 0 : parseInt(entry[6]),
+				events:(!entry[7]) ? '' : entry[7],
+				registered:false,
+				deleted:false
+			});
+
+		} else {
+			// assume mysql data (in form of JSON objects) otherwise
+			database.entries.push({
+				index 							: 	database.entries.length,
+				id 								: 	entry.student_id,
+				fname 							: 	entry.first,
+				lname 							: 	entry.last,
+				year 							: 	entry.year,
+				major 							: 	entry.major,
+				email 							: 	entry.email,
+				visits 							: 	0,									// 1 or 0 depending on whether entry has already been registered
+				events 							: 	'',									// contains string with current event's name
+				registered 						: 	false,								// flag indicating whether entry has been registered by the client
+				deleted 						: 	false,								// flag indicating whether entry has been issued a request for removal by client
+				existsInMysqlDatabase			: 	false, 								// flag indicating whether entry exists in main 'students' table in mysql server
+				addedToCurrentMysqlEventTable	: 	false 								// flag indicating whether entry exists  in  current event's mysql table
+			});
+		}
+
+		return database.entries[database.entries.length-1];
+	},
+
+	/**
+	 * Loops through each 'new' entry for this event added to the database and calls parameter function,
+	 * passing current entry and its index as parameters
+	 *
+	 * @param callback = {Function} to call on every iteration
+	**/
+	forEachNewEntry:function(callback) {
+		for(var i = 0; i < database.last_new_reg.length; i++) {
+			// call the passed function for every item in 'database' where 'database'
+			// is the scope, 'database.last_new_reg[i]' is the entry and 'i' is the current index
+			callback.call(database, database.last_new_reg[i], i);
+		}
+	},
+
+	/**
+	 * Loops through each database 'entry' and calls parameter function,
+	 * passing current entry and its index as parameters
+	 *
+	 * @param callback = {Function} to call on every iteration
+	**/
+	forEach:function(callback) {
+		for(var i=0;i<database.size();i++) {
+			// call the passed function for every item in 'database' where 'database'
+			// is the scope, 'database.get(i)' is the entry and 'i' is the current index
+			callback.call(database, database.get(i), i);
+		}
+	},
+	get:function(index) {
+		return database.entries[index];
+	},
+	getRawData:function() {
+		return database.raw_data;
+	},
+	getRegistered:function() {
+		return database.last_reg;
+	},
+	getRegisteredNew:function() {
+		return database.last_new_reg;
+	},
+	find:function(term) {
+		var results = [];
+		if(typeof term == 'object') {
+			var found = true;
+			for(var i=0;i<database.entries.length;i++) {
+				found = true;
+				for(var x in term) {
+					if(database.entries[i][x] != term[x]) {
+						found = false;
+					}
+				}
+				if(found) {
+					results.push(database.entries[i]);
+				}
+			}
+		} else {
+			for(var i=0;i<database.entries.length;i++) {
+				if(database.entries[i].id == term || database.entries[i].fname == term || database.entries[i].lname == term || database.entries[i].year == term || database.entries[i].major == term || database.entries[i].email == term) {
+					results.push(database.entries[i]);
+				}
+			}
+		}
+		return results;
+	},
+	has:function(id) {
+		var found = false;
+		for(var i=0;i<database.entries.length;i++) {
+			if(database.entries[i].id == id) {
+				found = true;
+				break;
+			}
+		}
+		return found;
+	},
+	hasRegistered:function(entry) {
+		var response = false;
+
+		if(typeof entry == 'object') {
+			for(var i=0;i<database.last_reg.length;i++) {
+				if(database.last_reg[i] == entry) {
+					response = true;
+				}
+			}
+		}
+
+		return response;
+	},
+	register:function(entry) {
+		if(typeof entry == 'object') {
+			// tell program entry is now registered
+			entry.registered = true;
+
+			// push entry to last_reg array of recently registered entries
+			database.last_reg.push(entry);
+
+		} else {
+			// if entry is a string, we assume we are given its id. Find object from id and store it
+			database.last_reg.push(database.find({
+				id:entry
+			})[0]);
+
+			//tell program entry is now	registered
+			entry.registered = true;
+		}
+	},
+	registerNew:function(entry) {
+		// tell program entry is now registered
+		entry.registered = true;
+
+		// store entry in the last_new_reg array of recently stored 'new' entries
+		database.last_new_reg.push(entry);
+	},
+	remove:function(entry) {
+		if(entry) {
+			entry.deleted = true;
+		}
+	},
+	setRawData:function(data) {
+		raw_data = data;
+	},
+	size:function() {
+		return database.entries.length;
 	}
 };
 
@@ -193,149 +406,6 @@ var routes = {
 };
 
 /**
- * define main database object used to hold, add, and handle data
- * entries from spreadsheet
-**/
-var db = {
-	entries:[],
-	raw_data:[],
-	last_reg:[],
-	last_new_reg:[],
-	global_values:[], 									//global_values[0] holds company name data
-	global_date:'0/0/0000',
-	add:function(entry) {
-		if(entry instanceof Array) {
-			db.raw_data.push(entry);
-			db.entries.push({
-				index:db.entries.length,
-				id:entry[0],
-				fname:entry[2],
-				lname:entry[1],
-				year:entry[3],
-				major:entry[4],
-				email:entry[5],
-				visits:entry[6] == ' ' ? 0 : parseInt(entry[6]),
-				events:(!entry[7]) ? '' : entry[7],
-				deleted:false
-			});
-		} else {
-			db.entries.push({
-				index:db.entries.length,
-				id:entry.student_id,
-				fname:entry.first,
-				lname:entry.last,
-				year:entry.year,
-				major:entry.major,
-				email:entry.email,
-				visits:0,
-				events:'',
-				deleted:false
-			});
-		}
-
-		return db.entries[db.entries.length-1];
-	},
-
-	/**
-	 * Loops through each database 'entry' and calls parameter function,
-	 * passing current entry and its index as parameters
-	 *
-	 * @param callback = {Function} to call on every iteration
-	**/
-	forEach:function(callback) {
-		for(var i=0;i<db.size();i++) {
-			// call the passed function for every item in 'database' where 'db'
-			// is the scope, 'db.get(i)' is the entry and 'i' is the current index
-			callback.call(db, db.get(i), i);
-		}
-	},
-	get:function(index) {
-		return db.entries[index];
-	},
-	getRawData:function() {
-		return db.raw_data;
-	},
-	getRegistered:function() {
-		return db.last_reg;
-	},
-	getRegisteredNew:function() {
-		return db.last_new_reg;
-	},
-	find:function(term) {
-		var results = [];
-		if(typeof term == 'object') {
-			var found = true;
-			for(var i=0;i<db.entries.length;i++) {
-				found = true;
-				for(var x in term) {
-					if(db.entries[i][x] != term[x]) {
-						found = false;
-					}
-				}
-				if(found) {
-					results.push(db.entries[i]);
-				}
-			}
-		} else {
-			for(var i=0;i<db.entries.length;i++) {
-				if(db.entries[i].id == term || db.entries[i].fname == term || db.entries[i].lname == term || db.entries[i].year == term || db.entries[i].major == term || db.entries[i].email == term) {
-					results.push(db.entries[i]);
-				}
-			}
-		}
-		return results;
-	},
-	has:function(id) {
-		var found = false;
-		for(var i=0;i<db.entries.length;i++) {
-			if(db.entries[i].id == id) {
-				found = true;
-				break;
-			}
-		}
-		return found;
-	},
-	isRegistered:function(entry) {
-		var response = false;
-
-		if(typeof entry == 'object') {
-			for(var i=0;i<db.last_reg.length;i++) {
-				if(db.last_reg[i] == entry) {
-					response = true;
-				}
-			}
-		}
-
-		return response;
-	},
-	register:function(id) {
-		if(typeof id == 'object') {
-			db.last_reg.push(id);
-		} else {
-			db.last_reg.push(db.find({
-				id:id
-			})[0]);
-		}
-	},
-	registerNew:function(id) {
-		db.last_new_reg.push(db.find({
-			id:id
-		})[0]);
-	},
-	remove:function(entry) {
-		if(entry) {
-			entry.deleted = true;
-		}
-	},
-	setRawData:function(data) {
-		raw_data = data;
-	},
-	size:function() {
-		return db.entries.length;
-	}
-};
-
-/**
  * Creates an http server and serves a static 'index.html' file
  * back to the client. Listens for 'API calls' from the client and 
  * serves back database information accordingly.
@@ -354,7 +424,7 @@ http.createServer(function(req, res) {
 			req.on('end',function() {
 				var id = value.split('id=')[1];
 				
-				var name = db.find({
+				var name = database.find({
 					id:id
 				});
 
@@ -363,7 +433,7 @@ http.createServer(function(req, res) {
 				};
 
 				if(name.length == 0) {
-					var name2 = db.find({
+					var name2 = database.find({
 						id:'00'+id
 					});
 
@@ -373,15 +443,17 @@ http.createServer(function(req, res) {
 				}
 
 				if(name.length > 0) {
-					var entry = db.get(name[0].index);
+					var entry = database.get(name[0].index);
 
-					if(db.isRegistered(entry)) {
+					// check to see if entry has already been registered for this event
+					if(entry.registered) {
 						response.alreadyRegistered = true;
 					} else {
 						entry.visits++;
-						entry.events += (db.global_values[0] || db.global_date)+',';
+						entry.events += (database.global_values[0] || global_date) + ',';
 
-						db.register(name[0]);
+						// register entry with the local database object indicating student has signed in to the event
+						database.register(name[0]);
 					}
 
 					response.fname = name[0].fname;
@@ -426,10 +498,10 @@ http.createServer(function(req, res) {
 				console.log('Registering \'' + entry.fname + ' ' + entry.lname + '\' with ID ' + entry.id);
 
 				// add entry id to list of registered entries
-				db.registerNew(entry.id);
+				database.registerNew(entry);
 
 				// create array object and push to database
-				db.add([
+				database.add([
 					entry.id,
 					entry.lname,
 					entry.fname,
@@ -437,7 +509,7 @@ http.createServer(function(req, res) {
 					entry.major,
 					entry.email,
 					'1',
-					(db.global_values[0] || db.global_date) + ','
+					(database.global_values[0] || global_date) + ','
 				]);
 
 				//return entry id in response object
@@ -469,7 +541,7 @@ http.createServer(function(req, res) {
 																// [3] -> data to use when applying action to target
 
 				if(command[1] == 'export') {
-					exportDB(command[2],function(err) {
+					exportDatabase((mysql.isConnected ? 'mysql' : command[2]), function(err) {
 						if(err) {
 							return res.end('ERR: There was an error exporting the data: '+err);
 						}
@@ -482,14 +554,14 @@ http.createServer(function(req, res) {
 					res.end('ERR: Unimplemented command.');
 				} else if(command[1] == 'event') {
 					if(command[2] == 'name') {
-						db.global_values[0] = decodeURIComponent(command[3]+' ('+db.global_date+')');
+						database.global_values[0] = decodeURIComponent(command[3]+' ('+global_date+')');
 						res.end('success');
 					} else if(command[2] == 'delete') {						
 						if(command[3] == 'top') {
-							db.remove(db.getRegistered()[0]);
+							database.remove(database.getRegistered()[0]);
 							res.end('success');
 						} else if(command[3] == 'bottom') {
-							db.remove(db.getRegistered()[db.getRegistered().length-1]);
+							database.remove(database.getRegistered()[database.getRegistered().length-1]);
 							res.end('success');
 						} else {
 							res.end('ERR: Invalid event action.');
@@ -521,99 +593,81 @@ http.createServer(function(req, res) {
 }).listen(SERVER_PORT);
 
 /**
- * Main function. Initializes program by fetching data from mysql
- * database, in order, by last_name ascending and populating db
- * object with it. Autoruns on program start.
-**/
-(function main() {
-	// begin adding to internal database object
-	populateDatabaseFromMysql(function() {
-		var date = new Date();
-		db.global_date = date.getMonth() + '/' + date.getDate() + '/'+date.getFullYear();
-
-		var autosave = (function auto_save_process() {
-			exportDB('excel','db_autosave.xlsx',function(err) {
-				if(err) {
-					return console.log('There was an error auto-saving to the database: '+err);
-				}
-
-				// log that the database has been auto-save
-				console.log('The database has been auto-saved');
-
-				// call auto_save function every minute
-				setTimeout(auto_save_process, (1000*60));
-			});
-		})();
-	});
-})();
-
-/**
- * Checks that EXCEL_OUTPUT_NAME file exists and reads all fields from it.
- * When file is parsed, it populates the 'db' object with data from its rows.
+ * Checks that EXCEL_OUTPUT_FILE file exists and reads all fields from it.
+ * When file is parsed, it populates the 'database' object with data from its rows.
  *
- * @param callback = {Function} to be called when mysql database query is complete.
+ * @param callback 		 	= {Function} 	to be called when mysql database query is complete.
+ * @callback_param mysql 	= {JSONObject} 	providing 'this' context for callback function
+ * @callback_param err		= {String}		explaining error for unsuccessful connection to mysql server
 **/
 function populateDatabaseFromMysql(callback) {
 	// issue query to get all fields from `students` in ascending order by last name
 	mysql.connect().query('SELECT * FROM students ORDER BY last ASC', function(err, rows, fields) {
 		// check for errors
 		if(err) {
-			// return and log error if found
-			return console.log('There was an error parsing database fetch request. -> '+err);
+			// log error if database query fails. 
+			console.log('There was an error parsing database fetch request. -> ' + err);
+			
+			// call callback function with context of mysql object, and pass err string as parameter
+			return callback.call(mysql, err);
 		}
 
 		// iterate through rows array and add each row object to the database
 		rows.forEach(function(row, index) {
-			db.add(row);
+			database.add(row);
 		});
 
 		//call passed callback function
-		callback.call();
+		callback.call(mysql);
 	});
 }
 
 /**
- * Checks that EXCEL_OUTPUT_NAME file exists and reads all fields from it.
- * When file is parsed, it populates the 'db' object with data from its rows.
+ * Checks that EXCEL_OUTPUT_FILE file exists and reads all fields from it.
+ * When file is parsed, it populates the 'database' object with data from its rows.
  *
  * @param callback = {Function} to be called when excel sheet is done being read.
 **/
 function populateDatabaseFromSpreadsheet(callback) {
 	// checks if file exists
-	if(fs.existsSync(EXCEL_OUTPUT_NAME)) {
-		// use excel package to read spreadsheet file
-		excel(EXCEL_OUTPUT_NAME, function(err,data) {
-			if(err) {
-				// exit function and log error message to database.
-				return console.log('Error reading database document. -> '+err);
-			}
+	if(!fs.existsSync(EXCEL_OUTPUT_FILE)) {
+		// define error message for no spreadsheet document found and exit
+		var err = 'There is no database document present. Unable to proceed.';
 
-			// loop through and add all rows (as arrays) from file to database
-			for(var i = 1; i < data.length; i++) {
-				db.add(data[i]);
-			}
-
-			// if callback function, call it with general context
-			if(typeof callback == 'function') {
-				callback.call(this);
-			}
-
-			// tell application, database has been populated
-			// from the spreadsheet file.
-			ready = true;
-
-			// add plain array from file as backup data to database.
-			db.setRawData(data);
-
-			// Log to database that database has been populated and app is ready.
-			console.log('Database loaded. Waiting for scanner...');
-		});
-	} else {
-		console.log('There is no database document present. Unable to proceed.');
+		// call callback function and pass error message
+		return callback.call(this, err);
 	}
+	
+	// use excel package to read spreadsheet file
+	excel(EXCEL_OUTPUT_FILE, function(err, data) {
+		if(err) {
+			// exit function and log error message to database.
+			return console.log('Error reading spreadsheet file. -> '+err);
+		}
+
+		// loop through and add all rows (as arrays) from file to database
+		for(var i = 1; i < data.length; i++) {
+			database.add(data[i]);
+		}
+
+		// if callback function, call it with general context
+		if(typeof callback == 'function') {
+			callback.call(this);
+		}
+
+		// tell application, database has been populated
+		// from the spreadsheet file.
+		ready = true;
+
+		// add plain array from file as backup data to database.
+		database.setRawData(data);
+
+		// Log to database that database has been populated and app is ready.
+		console.log('Database loaded. Waiting for scanner...');
+	});
 };
 
-function exportDB(type, fname, callback) {
+function exportDatabase(type, fname, callback) {
 	if(typeof fname == 'function' && !callback) {
 		callback = fname;
 		fname = null;
@@ -621,7 +675,7 @@ function exportDB(type, fname, callback) {
 
 	if(!fname) {
 		// define output file from global setting if none is given
-		fname = EXCEL_OUTPUT_NAME;
+		fname = EXCEL_OUTPUT_FILE;
 	}
 
 	if(type == 'excel' || !type) {
@@ -638,27 +692,32 @@ function exportDB(type, fname, callback) {
 		var data = [];											// array of 'entry' objects containing student information
 																// to be used with xlsx function to output data to spreadsheet
 
-		db.forEach(function(entry, index) {
+		database.forEach(function(entry, index) {
 			// only add entry to data array if it hasn't been 'removed'
 			if(!entry.deleted) {
 
 				data.push({
-					'ID'			:entry.id,					// contains student id as a string
-					'LAST'			:entry.lname,				// contains student's last name
-					'FIRST'			:entry.fname,				// contains student's first name
-					'STUCLASS_DESC' :entry.year,				// contains student's class (freshman .. senior)
-					'MAJR1'			:entry.major,				// contains student's area of study
-					'EMAIL'			:entry.email,				// contains student's school email
-					'VISITS'		:(""+entry.visits+""),		// add quotes to make sure value is treated as String, not Integer
-					'EVENTS'		:entry.events 				// string containing event name (followed by current date and a comma)
+					'ID'			: 	entry.id,				// contains student id as a string
+					'LAST'			: 	entry.lname,			// contains student's last name
+					'FIRST'			: 	entry.fname,			// contains student's first name
+					'STUCLASS_DESC' : 	entry.year,				// contains student's class (freshman .. senior)
+					'MAJR1'			: 	entry.major,			// contains student's area of study
+					'EMAIL'			: 	entry.email,			// contains student's school email
+					'VISITS'		: 	(''+entry.visits+''),	// add quotes to make sure value is treated as String, not Integer
+					'EVENTS'		: 	entry.events 			// string containing event name (followed by current date and a comma)
 				});
+
 			}
 		});
 
 		// write all objects in data array to created spreadsheet
-		xlsx.write(fname,data,function(err) {
+		return xlsx.write(fname, data, function(err) {
 			if(err) {
-				return console.log(err);
+				// log error
+				console.log(err);
+
+				// call callback function with error
+				return callback.call(this, err);
 			}
 
 			console.log('The excel document has been updated!');
@@ -667,6 +726,7 @@ function exportDB(type, fname, callback) {
 				callback.call(this);
 			}
 		});
+
 	} else if(type == 'csv') {
 		if(fs.existsSync('data.csv')) {
 			fs.unlink('data.csv',function(err) {
@@ -687,32 +747,313 @@ function exportDB(type, fname, callback) {
 			callback.call(this);
 		});
 
+		// 
 		stream.pipe(writeStream);
 
-		for(var i=0;i<db.size();i++) {
-			stream.write({first_name:db.get(i).fname,last_name:db.get(i).lname,email:db.get(i).email});
+		for(var i=0;i<database.size();i++) {
+			stream.write({first_name:database.get(i).fname,last_name:database.get(i).lname,email:database.get(i).email});
 		}
 
+		// release file resources and safely close stream
 		stream.end();
+
 	} else if(type == 'mysql') {
-		// connect to mysql server and export data from db object to it
-		db.forEach(function(entry, index) {
-			// iterate through each 'entry' and input its data as rows into the database
-			mysql.connect()
-				.query('INSERT INTO students(student_id, last, first, year, major, email) VALUES ("' +
-					entry.id 	+ '", "' +
-					entry.lname + '", "' +
-					entry.fname + '", "' +
-					entry.year 	+ '", "' + 
-					entry.major + '", "' +
-					entry.email + '")'
+		// check to see if server is still parsing request
+		if(mysql.isBusy) {
+			// if process is happening, advertise to console
+			return callback.call(this, 'unable to export database using mysql method. mysql server is still exporting last query request.');
+		}
+
+		// once a table has been created, determine whether main mysql server database table 'students' contains any data
+		if(!mysql.hasData) {
+			// tell app mysql process is busy
+			mysql.isBusy = true;
+
+			// define index to tell how many entries have been added to mysql database
+			var entryInsertCount = 0;
+
+			// iterate through database entries and exit
+			return database.forEach(function(entry) {
+				// if mysql database table 'students' is empty, populate it
+				mysql.insertInto(
+
+					'students', 
+					['student_id', 'last', 'first', 'year', 'major', 'email', 'date_added'],
+					[entry.id, entry.lname, entry.fname, entry.year, entry.major, entry.email, '1/9/14'],
+
+					function(err) {
+						// check for errors
+						if(err) {
+							// advertise any insertion erros
+							return console.log('error exporting database to empty mysql database table (students) -> ' + err);
+						}
+
+						// if no errors happen during query,
+						entryInsertCount++;
+
+						// tell our program entry now exists in mysql database
+						entry.existsInMysqlDatabase = true;
+
+						// if number of entries parsed is equal to total number of entries,
+						// database has finished populating entries into mysql server database
+						if(entryInsertCount == database.size()) {
+							// tell program mysql process is no longer busy
+							mysql.isBusy = false;
+
+							// if there are no errors populating empty mysql database, tell program mysql database now has data
+							mysql.hasData = true;
+
+							// advertise that database has now been populated
+							console.log('all local entries have been exported to mysql server database.');
+
+							// call callback function
+							callback.call(this);
+						}
+					}
 				);
+			});
+		}
+		
+		// if new entries have been added to the local database object, add them to our mysql database as well
+		database.forEach(function(entry, index) {
+			// check to see if entry in list of new entries for this event has already been added as new value to mysql
+			// table 'students'
+			if(!entry.existsInMysqlDatabase) {
+				// log that we are adding a newly registered person to the 'students' table in mysql database
+				console.log('adding new entry with id ' + entry.id + ' to the student mysql table.');
+
+				// insert new entry into database
+				mysql.insertInto(
+
+					'students', 
+					['student_id', 'last', 'first', 'year', 'major', 'email', 'date_added'],
+					[entry.id, entry.lname, entry.fname, entry.year, entry.major, entry.email, global_date],
+
+					function(err) {
+						if(err) {
+							// log error and exit
+							return console.log('[Fatal]: an error inserting new students into mysql table \'students\' -> ' + err);
+						}
+
+						// if no error, tell program new entry has been added
+						entry.existsInMysqlDatabase = true;
+					}
+				);
+			}
+
+			// if entry has been registered in to the current event and it hasn't yet added to table containing list
+			// of students who showed up to event, insert it
+			if(entry.registered && !entry.addedToCurrentMysqlEventTable) {
+				// log that we are adding registered student to the mysql database
+				console.log('adding registered entry with id ' + entry.id + ' to the current event table in mysql server.');
+
+				// insert entry if registered and not previously added to the table of registered students for this event
+				mysql.insertInto(
+
+					mysql.eventTableName, 
+					['student_id'],
+					[entry.id],
+
+					function(err) {
+						// check for errors
+						if(err) {
+							// log error and exit
+							return console.log('[Fatal]: an error inserting new students into mysql table \'students\' -> ' + err);
+						}
+
+						// if no error, tell program new entry has been added
+						entry.addedToCurrentMysqlEventTable = true;
+					}
+				);
+			}
 		});
 
-		console.log('successfully exported data to the mysql server.');
+		// call our calback function. Notice we are taking a risk to simplify things and ignoring any potential mysql errors from
+		// two processes above, and continuing program as usual anyway. This may be addressed later as it is not urgent.
+		return callback.call(this);
+
 	} else {
-		var err = 'exportDB error: Invalid type.';
-		callback.call(this,err)
-		return console.log(err);
+		// if type is undefined, or invalid, output error
+		var err = 'exportDatabase error: Invalid type.';
+
+		// exit and call callback function and pass err variable as first @param
+		return callback.call(this, err);
 	}
 };
+
+/**
+ * Main function. Initializes program by fetching data from mysql
+ * database, in order, by last_name ascending and populating database
+ * object with it. Autoruns on program start.
+**/
+(function main() {
+	// create new instance of a date object
+	var date = new Date();
+
+	// assign the current date to the database (increase .getMonth() by one since months start at 0)
+	mysql.eventTableName = global_date = (date.getMonth() + 1) + '_' + date.getDate() + '_' + date.getFullYear();
+
+	// before we try to populate internal database object, check to see if mysql server has any data in it
+	mysql.connect().query('SELECT id FROM students', function(err, rows, fields) {
+		// check for mysql query errors
+		if(err) {
+			// if error, assume mysql server is not available, don't use mysql server at all. Fall back to spreadsheet implementation and advertise this to console
+			console.log('Using spreadsheet file to populate database instead.');
+
+			// populate database from spreadsheet and exit
+			return populateDatabaseFromSpreadsheet(function(err) {
+				if(err) {
+					// if fallback spreadsheet implementation errors, advertise error message and exit.
+					return console.log(	'[Fatal]: There was an error populating the database using spreadsheet' +
+										'file as backup, and the mysql database as a primary means -> ' + err);
+				}
+
+				// init autosave function using 'excel' method
+				autosave('excel');
+			});
+		}
+
+		// if no err, we know mysql server exists, check for event table
+		// check to see whether current event's table has been created.
+		// Warning: this module may execute while database is populated from 'if' statement below
+		if(!mysql.eventTableCreated) {
+			// tell program mysql process is busy
+			mysql.isBusy = true;
+
+			// tell console we're creating a table for our event instead of updating the mysql database. hopefully just this once.
+			console.log('creating table in mysql database for the current event');
+
+			// create mysql table for current event if it doesn't exist
+			mysql.connect()
+				// since we have 'students' table containing rest of student data, we simply store student_id so we only have one
+				// place to update data in the future. when we want student information, we fetch it from 'students' using student_id
+				.query('CREATE TABLE IF NOT EXISTS ' + mysql.eventTableName + ' (' +
+				
+					'`id` int(11) unsigned NOT NULL AUTO_INCREMENT,'	+
+					'`student_id` varchar(25) DEFAULT NULL,'			+
+					'PRIMARY KEY (`id`)'								+
+
+				') ENGINE=InnoDB DEFAULT CHARSET=utf8', function(err) {
+					// tell program request has been parsed
+					mysql.isBusy = false;
+
+					// check for error
+					if(err) {
+						// if an error occurrs creating table for current event, 
+						return console.log('[Fatal]: An error occurred creating a mysql table for the current event -> ' + err);
+					}
+
+					// if table creation succeeds, tell console it has been created
+					console.log('mysql table successfully created for this event.');
+
+					// and also tell program table now exists
+					mysql.eventTableCreated = true;
+
+					// index table and see which entries from database exist on it (done in case application is restarted more than once in the same event)
+					mysql.connect()
+						.query('SELECT * FROM ' + mysql.eventTableName, function(err, rows, fields) {
+							// check for errors
+							if(err) {
+								return callback.call(this, '[Fatal]: An error occurred attempting to check previously stored data in mysql event table -> ' + err);
+							}
+
+							// check to see if there are values stored in table
+							if(rows.length) {
+								// iterate through table data
+								rows.forEach(function(row) {
+									// attempt to find current entry in local database object
+									var entry = database.find({
+										id : row.student_id
+									});
+
+									// if value is found in local database object by its id...
+									if(entry.length) {
+										// ...set its flag indicating that its added to current event table in mysql server to true
+										entry[0].addedToCurrentMysqlEventTable = true;
+
+										// since entry is already added to current event's mysql table, mark it as registered
+										entry[0].registered = true;
+									}									
+								});
+							}
+						});
+				});
+
+		}
+
+		// if no error fetching data, check to see if any data in database. don't take into account if table has been created or not
+		if(rows.length) {
+			// if mysql table contains data, tell program it does have data
+			mysql.hasData = true;
+
+			// then, begin adding such data to internal database object
+			populateDatabaseFromMysql(function(err) {
+				// if mysql server not available, or mysql query not successful
+				if(err) {
+					// if error, advertise fatal error and exit
+					return console.log('[Fatal]: There was an error fetching data from the mysql server -> ' + err);
+				}
+
+				// if database successfully populated from mysql database, tell database all current entries exist in the mysql database
+				database.forEach(function(entry) {
+					// set flag for entry's existence in mysql server
+					entry.existsInMysqlDatabase = true;
+				});
+
+				// if success, begin autosaving data in mysql mode (to mysql server)
+				autosave('mysql');
+			});
+
+		} else {
+			// mysql database is empty. advertise that we are loading data from spreadsheet to populate mysql table
+			console.log('no data found on mysql server. using spreadsheet to populate internal database.');
+
+			// if no data in database, use spreadsheet data to populate our local database object, and then
+			// use the newly populated local 'database' object to populate mysql server database
+			populateDatabaseFromSpreadsheet(function(err) {
+				// check for errors
+				if(err) {
+					// advertise error and exit
+					return console.log('[Fatal]: Error populating local database object from spreadsheet -> ' + err);
+				}
+
+				// once internal database object has data in it, export data to mysql server if empty
+				exportDatabase('mysql', EXCEL_AUTOSAVE_FILE, function(err) {
+					// detect if error copying data from database object to mysql server database
+					if(err) {
+						// if error filling empty mysql database, advertise such error
+						console.log('An error occurred populating empty mysql database -> ' + err);
+
+						// since we are using spreadsheet as main source of data, keep auto-saving that instead and exit
+						return autosave('excel');
+					}
+
+					// begin auto-saving new data to mysql database
+					autosave('mysql');
+				});
+			});
+
+		}
+	});
+
+	// define autosave function, uses recursion to create a new 'backup' file every minute
+	function autosave(method) {
+		// export all data in database to excel file
+		exportDatabase(method, EXCEL_AUTOSAVE_FILE, function(err) {
+			// check for errors
+			if(err) {
+				return console.log('There was an error auto-saving to the database: ' + err);
+			}
+
+			// advertise that the database has been auto-saved
+			console.log('The database has been auto-saved.');
+
+			// set timeout of 60 seconds
+			setTimeout(function() {
+				// call method recursively to start auto-save process again
+				autosave.call(this, method);
+			}, (1000 * 60));
+		});
+			
+	}
+})();

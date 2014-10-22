@@ -7,6 +7,9 @@
 * @author juanvallejo
 * @date 10/15/14
 *
+* TODO: add total number of students to length column in 'events' table on 'manual save'.
+* 		add total number of new students to length_new column
+*
 * Scanner application 'server'. Handles all data processing and i/o.
 * Reads data from a local mysql database, builds an internal structure
 * with it, and allows for easy manipulation of it. Outputs to .xlsx file.
@@ -204,6 +207,38 @@ var mysql = {
 					// get err param if any and pass it to callback before calling
 					callback.call(mysql, err);
 				});
+	},
+
+	/**
+	 * updates entry in database table, using passed logic
+	 *
+	 * @param mysqlTableName  	= {Object}		entry object from local 'database' object
+	 * @param databaseColumns 	= {Array} 		containing names of mysql table columns to update values
+	 * @param updatedValues		= {Array} 		containing updated entry values
+	 * @param whereLogic 		= {String} 		containing equality to use to target the update of a specific row
+	 * @param callback 			= {Function} 	to call after operation has completed successfully
+	**/
+	update:function(mysqlTableName, databaseColumns, updatedValues, whereLogic, callback) {
+		// variable containing key value pairs to update from arrays passed
+		var keyValuePairs = '';
+
+		// generate and store key-value pairs from our two arrays
+		databaseColumns.forEach(function(column, index) {
+			// add to our string of pairs
+			keyValuePairs += ',' + column + ' = ' + '"' + updatedValues[index] + '"';
+		});
+
+		// strip comma from key value pairs string
+		keyValuePairs = keyValuePairs.substring(1);
+
+		// join arrays of column names and values to add by commas and add them to our query string
+		mysql.connect()
+			.query('UPDATE ' + mysqlTableName + ' SET ' + keyValuePairs + ' WHERE ' + (whereLogic || ''), 
+				// call user's callback function
+				function(err) {
+					// get err param if any and pass it to callback before calling
+					callback.call(mysql, err);
+				});
 	}
 };
 
@@ -216,7 +251,7 @@ var database = {
 	raw_data:[],
 	last_reg:[],
 	last_new_reg:[],
-	global_values:[], 									//global_values[0] holds company name data
+	global_values:[], 																	// global_values[0] holds company name data
 
 	add:function(entry) {
 		// if we are passed an array of arrays, assume data came from parsing an excel spreadsheet
@@ -248,7 +283,8 @@ var database = {
 				email 							: 	entry.email,
 				visits 							: 	0,									// 1 or 0 depending on whether entry has already been registered
 				events 							: 	'',									// contains string with current event's name
-				registered 						: 	false,								// flag indicating whether entry has been registered by the client
+				isNew 							: 	entry.isNew 	 || false, 			// flag indicating whether entry is new to the database
+				registered 						: 	entry.registered || false,			// flag indicating whether entry has been registered by the client
 				deleted 						: 	false,								// flag indicating whether entry has been issued a request for removal by client
 				existsInMysqlDatabase			: 	false, 								// flag indicating whether entry exists in main 'students' table in mysql server
 				addedToCurrentMysqlEventTable	: 	false 								// flag indicating whether entry exists  in  current event's mysql table
@@ -365,6 +401,12 @@ var database = {
 	registerNew:function(entry) {
 		// tell program entry is now registered
 		entry.registered = true;
+
+		// tell program whether entry is new
+		entry.isNew = true;
+
+		// add entry to the main database
+		database.add(entry);
 
 		// store entry in the last_new_reg array of recently stored 'new' entries
 		database.last_new_reg.push(entry);
@@ -492,32 +534,20 @@ http.createServer(function(req, res) {
 				});
 
 				// format the entry id to include two 0's in front of number to match database format
-				entry.id = '00' + entry.id;
+				entry.student_id = '00' + entry.student_id;
 
 				// #todo change format of name in client side
-				console.log('Registering \'' + entry.fname + ' ' + entry.lname + '\' with ID ' + entry.id);
+				console.log('Registering \'' + entry.first + ' ' + entry.last + '\' with ID ' + entry.student_id);
 
 				// add entry id to list of registered entries
 				database.registerNew(entry);
 
-				// create array object and push to database
-				database.add([
-					entry.id,
-					entry.lname,
-					entry.fname,
-					entry.year,
-					entry.major,
-					entry.email,
-					'1',
-					(database.global_values[0] || global_date) + ','
-				]);
-
 				//return entry id in response object
-				response.id = entry.id;
+				response.id = entry.student_id;
 
-				if(entry.fname) {
-					response.fname = entry.fname;
-					response.lname = entry.lname;
+				if(entry.first) {
+					response.fname = entry.first;
+					response.lname = entry.last;
 					response.registered = true;
 				} else {
 					response.registered = false;
@@ -541,20 +571,38 @@ http.createServer(function(req, res) {
 																// [3] -> data to use when applying action to target
 
 				if(command[1] == 'export') {
+					// override second command if mysql server is currently being used for data
+					// by exporting database we are simply updating new entries and registered students
 					exportDatabase((mysql.isConnected ? 'mysql' : command[2]), function(err) {
+						// check for errors
 						if(err) {
+							// send error message back to client and exit
 							return res.end('ERR: There was an error exporting the data: '+err);
 						}
 
+						// advertise method of database export
+						console.log('database exported through command');
+
+						// send success message back to client
 						res.end('success');
 					});
+
+					// generate a mysql table with all student information to easily add to spreadsheet
+					generateOutputMysqlTable();
+
 				} else if(command[1] == 'query') {
+					// send error back to client
 					res.end('I am not allowed to index the database yet.');
 				} else if(command[1] == 'create') {
 					res.end('ERR: Unimplemented command.');
 				} else if(command[1] == 'event') {
 					if(command[2] == 'name') {
 						database.global_values[0] = decodeURIComponent(command[3]+' ('+global_date+')');
+
+						// add event with its new name to the 'events' table in the mysql database
+						addToMysqlEventsTableUsingName(decodeURIComponent(command[3]));
+
+						// send success message back to client
 						res.end('success');
 					} else if(command[2] == 'delete') {						
 						if(command[3] == 'top') {
@@ -591,6 +639,53 @@ http.createServer(function(req, res) {
 		});
 	}
 }).listen(SERVER_PORT);
+
+/**
+ * Takes the event's official name assigned by the user through the client, and 
+ * adds it to the mysql 'events' table, pairing it with the table's name (created using the global_date
+ * for such event.
+ *
+ * @param eventName	= {String} containing current event's name assigned through the client by user
+**/
+function addToMysqlEventsTableUsingName(eventName) {
+	// check to see if database has already been added to events table in mysql server
+	mysql.connect()
+		.query('SELECT * FROM events WHERE table_name = \'' + global_date + '\'', function(err, rows, fields) {
+			// check for errors
+			if(err) {
+				// log error
+				return console.log('An error occurred checking if a table name has previously been assigned to the mysql events table -> ' + err);
+			}
+
+			// if success, determine whether table has indeed been added to events table before
+			if(rows.length) {
+				mysql.update('events', ['event_name'], [eventName], 'table_name = "' + global_date + '"', function(err) {
+					// check for errors
+					if(err) {
+						// log error and exit
+						return console.log('An error occurred updating table name information in mysql server -> ' + err);
+					}
+
+					// log success
+					console.log('successfully renamed table ' + global_date + ' to ' + eventName + ' in mysql events table.');
+				});
+			} else {
+				// if table has never been registered with an event name, register it
+				mysql.insertInto('events', ['table_name', 'event_name'], [global_date, eventName], function(err) {
+					// check for errors
+					if(err) {
+						// log error and exit
+						return console.log('An error occurred adding event-table ' + 
+							global_date + ' with name ' + eventName + ' to the mysql server -> ' + err);
+					}
+
+					// if no errors advertise success to console
+					console.log('successfully added table ' + global_date + ' with name ' + eventName + ' to mysql events table ');
+				});
+			}
+
+		});
+}
 
 /**
  * Checks that EXCEL_OUTPUT_FILE file exists and reads all fields from it.
@@ -779,7 +874,7 @@ function exportDatabase(type, fname, callback) {
 
 					'students', 
 					['student_id', 'last', 'first', 'year', 'major', 'email', 'date_added'],
-					[entry.id, entry.lname, entry.fname, entry.year, entry.major, entry.email, '1/9/14'],
+					[entry.id, entry.lname, entry.fname, entry.year, entry.major, entry.email, '9_1_14'],
 
 					function(err) {
 						// check for errors
@@ -851,8 +946,8 @@ function exportDatabase(type, fname, callback) {
 				mysql.insertInto(
 
 					mysql.eventTableName, 
-					['student_id'],
-					[entry.id],
+					['student_id', 'is_new'],
+					[entry.id, (entry.isNew ? '1' : '')],
 
 					function(err) {
 						// check for errors
@@ -880,6 +975,77 @@ function exportDatabase(type, fname, callback) {
 		return callback.call(this, err);
 	}
 };
+
+/**
+ * genereates an output table in mysql database containing final student data
+ * for the current event
+**/
+function generateOutputMysqlTable() {
+	// store name of our output table for ease of access to it
+	var outputTableName = mysql.eventTableName + '_output';
+	
+	// create mysql table for current event if it doesn't exist
+	mysql.connect()
+		// since we have 'students' table containing rest of student data, we simply store student_id so we only have one
+		// place to update data in the future. when we want student information, we fetch it from 'students' using student_id
+		.query('CREATE TABLE IF NOT EXISTS ' + outputTableName + ' (' +
+		
+			'`id` int(11) unsigned NOT NULL AUTO_INCREMENT,'	+
+			'`student_id` varchar(25) DEFAULT NULL,'			+
+			'`first` varchar(25) DEFAULT NULL,'					+
+			'`last` varchar(25) DEFAULT NULL,'					+
+			'`email` varchar(50) DEFAULT NULL,'					+
+			'`year` varchar(20) DEFAULT NULL,'					+
+			'`major` varchar(30) DEFAULT NULL,'					+
+			'`date_added` varchar(25) DEFAULT NULL,'			+
+			'`at_event` varchar(2) DEFAULT NULL,'				+
+			'`is_new` varchar(2) DEFAULT NULL,'					+
+			'PRIMARY KEY (`id`)'								+
+
+		') ENGINE=InnoDB DEFAULT CHARSET=utf8', function(err) {
+			// check for errors
+			if(err) {
+				// if an error occurrs creating table for current event, 
+				return console.log('[Fatal]: An error occurred creating a mysql table for the current event -> ' + err);
+			}
+
+			// if no errors occur, truncate the table to resave all updated data to it
+			mysql.connect()
+				.query('TRUNCATE TABLE ' + outputTableName, function(err) {
+					if(err) {
+						// log error and exit
+						return console.log('[Fatal]: An error occurred truncating mysql output table for current event -> ' + err);
+					}
+
+					// if no errors, iterate through local database object entries
+					database.forEach(function(entry, index) {
+						// insert entry into output database
+						mysql.insertInto(
+
+							outputTableName, 
+							['student_id', 'first', 'last', 'email', 'year', 'major', 'date_added', 'at_event', 'is_new'],
+							[entry.id, entry.fname, entry.lname, entry.email, entry.year, entry.major, global_date, (entry.registered ? '1' : ''), (entry.isNew ? '1' : '')],
+
+							function(err) {
+								// check for errors
+								if(err) {
+									// log error and exit
+									return console.log('[Fatal]: an error inserting new students into mysql table \'' + outputTableName + '\' -> ' + err);
+								}
+
+								// check to see if index of current entry is last one
+								if(index + 1 == database.size()) {
+									// log that we are done creating output table in database
+									console.log('successfully created output table in mysql database!');
+								}
+							}
+						);
+					});
+
+				})
+
+		});
+}
 
 /**
  * Main function. Initializes program by fetching data from mysql
@@ -931,6 +1097,7 @@ function exportDatabase(type, fname, callback) {
 				
 					'`id` int(11) unsigned NOT NULL AUTO_INCREMENT,'	+
 					'`student_id` varchar(25) DEFAULT NULL,'			+
+					'`is_new` varchar(2) DEFAULT NULL,'					+
 					'PRIMARY KEY (`id`)'								+
 
 				') ENGINE=InnoDB DEFAULT CHARSET=utf8', function(err) {

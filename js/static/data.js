@@ -415,7 +415,7 @@ window.addEventListener('load', function() {
 									// check if the entry has already been updated with the server
 									if(student.alreadyRegistered) {
 										// output message to the input field
-										sid.value = 'Welc... oh, you again?';
+										sid.value = 'You\'ve already been signed in!';
 
 										// output message to the interface console
 										sid.error('You cannot register more than once per event.');

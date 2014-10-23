@@ -263,7 +263,7 @@ window.addEventListener('load',function() {
 
 							if(student.registered) {
 								if(student.alreadyRegistered) {
-									sid.value = 'Welc... oh, you again?';
+									sid.value = 'You\'ve already been registered!';
 									sid.error('You cannot register more than once per event.');
 								} else {
 									stats.total++;

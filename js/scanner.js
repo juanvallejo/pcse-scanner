@@ -590,6 +590,9 @@ http.createServer(function(req, res) {
 					// generate a mysql table with all student information to easily add to spreadsheet
 					generateOutputMysqlTable();
 
+					// update mysql 'events' table with current entry counts
+					addToMysqlEventsTableUsingName(mysql.eventTableName);
+
 				} else if(command[1] == 'query') {
 					// send error back to client
 					res.end('I am not allowed to index the database yet.');
@@ -648,6 +651,8 @@ http.createServer(function(req, res) {
  * @param eventName	= {String} containing current event's name assigned through the client by user
 **/
 function addToMysqlEventsTableUsingName(eventName) {
+	// now that a name for this event has been passed, assign in to our mysql object
+	mysql.eventTableName = eventName;
 	// check to see if database has already been added to events table in mysql server
 	mysql.connect()
 		.query('SELECT * FROM events WHERE table_name = \'' + global_date + '\'', function(err, rows, fields) {
@@ -659,7 +664,16 @@ function addToMysqlEventsTableUsingName(eventName) {
 
 			// if success, determine whether table has indeed been added to events table before
 			if(rows.length) {
-				mysql.update('events', ['event_name'], [eventName], 'table_name = "' + global_date + '"', function(err) {
+				mysql.update(
+
+					'events', 
+					['event_name', 'total', 'total_new'], 
+					[eventName, (database.getRegistered().length + database.getRegisteredNew().length), database.getRegisteredNew().length], 
+
+					// add 'where' conditional logic
+					'table_name = "' + global_date + '"', 
+
+					function(err) {
 					// check for errors
 					if(err) {
 						// log error and exit
@@ -670,8 +684,15 @@ function addToMysqlEventsTableUsingName(eventName) {
 					console.log('successfully renamed table ' + global_date + ' to ' + eventName + ' in mysql events table.');
 				});
 			} else {
-				// if table has never been registered with an event name, register it
-				mysql.insertInto('events', ['table_name', 'event_name'], [global_date, eventName], function(err) {
+				// if table has never been registered with an event name, register it, adding default (global_date) name,
+				// associating that with user-generated event_name, total number of registered entries so far, and total new entries
+				mysql.insertInto(
+
+					'events', 
+					['table_name', 'event_name', 'total', 'total_new'], 
+					[global_date, eventName, (database.getRegistered().length + database.getRegisteredNew().length), database.getRegisteredNew().length], 
+
+					function(err) {
 					// check for errors
 					if(err) {
 						// log error and exit
@@ -945,7 +966,7 @@ function exportDatabase(type, fname, callback) {
 				// insert entry if registered and not previously added to the table of registered students for this event
 				mysql.insertInto(
 
-					mysql.eventTableName, 
+					global_date, 
 					['student_id', 'is_new'],
 					[entry.id, (entry.isNew ? '1' : '')],
 
@@ -982,7 +1003,7 @@ function exportDatabase(type, fname, callback) {
 **/
 function generateOutputMysqlTable() {
 	// store name of our output table for ease of access to it
-	var outputTableName = mysql.eventTableName + '_output';
+	var outputTableName = global_date + '_output';
 	
 	// create mysql table for current event if it doesn't exist
 	mysql.connect()
@@ -1118,7 +1139,7 @@ function generateOutputMysqlTable() {
 
 					// index table and see which entries from database exist on it (done in case application is restarted more than once in the same event)
 					mysql.connect()
-						.query('SELECT * FROM ' + mysql.eventTableName, function(err, rows, fields) {
+						.query('SELECT * FROM ' + global_date, function(err, rows, fields) {
 							// check for errors
 							if(err) {
 								return callback.call(this, '[Fatal]: An error occurred attempting to check previously stored data in mysql event table -> ' + err);
@@ -1143,6 +1164,9 @@ function generateOutputMysqlTable() {
 									}									
 								});
 							}
+
+							// add table with default name (global_name) to events table in mysql server
+							addToMysqlEventsTableUsingName(global_date);
 						});
 				});
 

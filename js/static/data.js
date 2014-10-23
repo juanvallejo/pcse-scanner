@@ -258,7 +258,7 @@ window.addEventListener('load', function() {
 							}
 
 							sid.value = '';
-							sid.write('This event\'t name has been set to '+sid.temp[0]);
+							sid.write('This event\'s name has been set to '+sid.temp[0]);
 						});
 					} else {
 						sid.error();
@@ -379,12 +379,12 @@ window.addEventListener('load', function() {
 							sid.value = '';
 
 							// format outgoing data string with new student information
-							data = 	'id='		+ sid.sid 		+ 			// contains student id
-									'&fname=' 	+ sid.fname 	+ 			// contains student first name
-									'&lname='	+ sid.lname		+			// contains student last name
-									'&year=' 	+ sid.year 		+			// contains student year
-									'&major='	+ sid.major		+			// contains student major
-									'&email='	+ sid.email 	;			// contains student email
+							data = 	'student_id='	+ sid.sid 		+ 			// contains student id
+									'&first=' 		+ sid.fname 	+ 			// contains student first name
+									'&last='		+ sid.lname		+			// contains student last name
+									'&year=' 		+ sid.year 		+			// contains student year
+									'&major='		+ sid.major		+			// contains student major
+									'&email='		+ sid.email 	;			// contains student email
 
 							// update api request to register entry as new
 							uri = '/register/new';

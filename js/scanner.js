@@ -7,9 +7,6 @@
 * @author juanvallejo
 * @date 10/15/14
 *
-* TODO: add total number of students to length column in 'events' table on 'manual save'.
-* 		add total number of new students to length_new column
-*
 * Scanner application 'server'. Handles all data processing and i/o.
 * Reads data from a local mysql database, builds an internal structure
 * with it, and allows for easy manipulation of it. Outputs to .xlsx file.

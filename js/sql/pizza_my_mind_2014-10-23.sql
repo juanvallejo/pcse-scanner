@@ -7,7 +7,7 @@
 #
 # Host: 127.0.0.1 (MySQL 5.6.15)
 # Database: pizza_my_mind
-# Generation Time: 2014-10-23 07:20:46 +0000
+# Generation Time: 2014-10-23 14:05:17 +0000
 # ************************************************************
 
 
@@ -295,20 +295,6 @@ VALUES
 
 /*!40000 ALTER TABLE `10_2_2014` ENABLE KEYS */;
 UNLOCK TABLES;
-
-
-# Dump of table 10_23_2014
-# ------------------------------------------------------------
-
-DROP TABLE IF EXISTS `10_23_2014`;
-
-CREATE TABLE `10_23_2014` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `student_id` varchar(25) DEFAULT NULL,
-  `is_new` varchar(2) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
 
 
 # Dump of table 10_9_2014
@@ -1278,22 +1264,24 @@ CREATE TABLE `events` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `table_name` varchar(50) DEFAULT NULL,
   `event_name` varchar(50) DEFAULT NULL,
+  `total` int(11) DEFAULT NULL,
+  `total_new` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 LOCK TABLES `events` WRITE;
 /*!40000 ALTER TABLE `events` DISABLE KEYS */;
 
-INSERT INTO `events` (`id`, `table_name`, `event_name`)
+INSERT INTO `events` (`id`, `table_name`, `event_name`, `total`, `total_new`)
 VALUES
-	(1,'8_28_2014','PCSE Majors Meeting '),
-	(2,'9_4_2014','PARASITX'),
-	(3,'9_11_2014','EPIC'),
-	(4,'9_18_2014','Augmented Reality Team'),
-	(5,'9_25_14','Carmax'),
-	(6,'10_2_2014','NASA Develop'),
-	(7,'10_9_2014','Resume Session'),
-	(8,'10_16_2014','Five Year Masters');
+	(1,'8_28_2014','PCSE Majors Meeting ',NULL,NULL),
+	(2,'9_4_2014','PARASITX',NULL,NULL),
+	(3,'9_11_2014','EPIC',NULL,NULL),
+	(4,'9_18_2014','Augmented Reality Team',NULL,NULL),
+	(5,'9_25_14','Carmax',NULL,NULL),
+	(6,'10_2_2014','NASA Develop',NULL,NULL),
+	(7,'10_9_2014','Resume Session',NULL,NULL),
+	(8,'10_16_2014','Five Year Masters',NULL,NULL);
 
 /*!40000 ALTER TABLE `events` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -1830,8 +1818,7 @@ VALUES
 	(507,'00901471','Wright','Taylor','Freshman','Sociology','taylor.wright.14@cnu.edu','9_1_14'),
 	(508,'00869350','Wynn','Camren','Junior','Computer Engineering','camren.wynn.12@cnu.edu','9_1_14'),
 	(509,'00896307','Yoder','Grace','Freshman','Computer Engineering','grace.yoder.14@cnu.edu','9_1_14'),
-	(510,'00905789','Yu','Sang Hyok','Sophomore','Computer Science','sanghyok.yu.14@cnu.edu','9_1_14'),
-	(511,'00453876','Student','Test','Junior','cpse','test.student@cnu.edu','10_22_2014');
+	(510,'00905789','Yu','Sang Hyok','Sophomore','Computer Science','sanghyok.yu.14@cnu.edu','9_1_14');
 
 /*!40000 ALTER TABLE `students` ENABLE KEYS */;
 UNLOCK TABLES;

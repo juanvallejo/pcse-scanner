@@ -111,6 +111,48 @@ function parseBarcode(code) {
 };
 
 /**
+ * define main app settings and methods
+**/
+var scanner = {
+	// define fields, properties, and flags
+	events : {}, 														// holds created event keys and associated callback functions in array values
+
+	/**
+	 * 'emits' an app 'event' by calling all queued callback functions
+	 * under that specific event's value array, using its name as key
+	 *
+	 * @param eventName = {String} containing name-key of event
+	**/
+	emit : function(eventName) {
+		// check if event key has been initialized
+		if(scanner.events.eventName && scanner.events.eventName.length) {
+			// if event key has been created under events, and it contains functions, call them
+			scanner.events.eventName.forEach(function(action) {
+				action.call(scanner);
+			});
+		}
+	},
+
+	/**
+	 * 'emits' an app 'event' by calling all queued callback functions
+	 * under that specific event's value array, using its name as key
+	 *
+	 * @param eventName = {String} containing name-key of event
+	 * @param callback = {Function} containing action to perform when event is emitted
+	**/
+	on : function(eventName, callback) {
+		// check to see if event has been created before
+		if(!scanner.events.eventName) {
+			// allocate new entry for eventName, and initialize its array value to hold functions
+			scanner.events.eventName = [];
+		}
+
+		// add callback function to list of functions to be called when event is emitted.
+		scanner.events.eventName.push(callback);
+	}
+};
+
+/**
  * define mysql connection object
 **/
 var mysql = {
@@ -134,7 +176,7 @@ var mysql = {
 	 * @param password	= {String} specifying database account password
 	 * @param database 	= {String} specifying the name of database to connect to
 	**/
-	connect: function(host, user, password, database) {
+	connect : function(host, user, password, database) {
 		// check to see if previous connection exists, or @params for new connection are passed
 		if(!mysql.isConnected || (host && user && password)) {
 			// create connection blueprint
@@ -172,7 +214,7 @@ var mysql = {
 	/**
 	 * safely closes the mysql connection
 	**/
-	end:function() {
+	end : function() {
 		if(mysql.isConnected) {
 			// reset our flag to indicate no connection exists
 			mysql.isConnected = false;
@@ -190,7 +232,7 @@ var mysql = {
 	 * @param valuesToAdd		= {Array} 		containing entry values to add
 	 * @param callback 			= {Function} 	to call after operation has completed successfully
 	**/
-	insertInto:function(mysqlTableName, databaseColumns, valuesToAdd, callback) {
+	insertInto : function(mysqlTableName, databaseColumns, valuesToAdd, callback) {
 		// our values to add have to be in quotes. Add them to each value on the list
 		valuesToAdd.forEach(function(value, index) {
 			valuesToAdd[index] = '"' + value + '"';
@@ -207,6 +249,22 @@ var mysql = {
 	},
 
 	/**
+	 * selects entries from table, using passed logic
+	 *
+	 * @param mysqlTableName  	= {Object}		entry object from local 'database' object
+	 * @param databaseColumns 	= {Array} 		containing names of mysql table columns to select
+	 * @param whereLogic 		= {String} 		containing equality to use to target the selection of a specific row
+	 * @param callback 			= {Function} 	to call after operation has completed successfully
+	 *
+	 * if @param whereLogic is 'null', all rows are selected and returned
+	**/
+	selectFrom : function(mysqlTableName, databaseColumns, whereLogic, callback) {
+		// perform query
+		mysql.connect()
+			.query('SELECT ' + databaseColumns.join(',') + ' FROM ' + mysqlTableName + ' WHERE ' + (whereLogic || '1 = 1'), callback);
+	},
+
+	/**
 	 * updates entry in database table, using passed logic
 	 *
 	 * @param mysqlTableName  	= {Object}		entry object from local 'database' object
@@ -215,7 +273,7 @@ var mysql = {
 	 * @param whereLogic 		= {String} 		containing equality to use to target the update of a specific row
 	 * @param callback 			= {Function} 	to call after operation has completed successfully
 	**/
-	update:function(mysqlTableName, databaseColumns, updatedValues, whereLogic, callback) {
+	update : function(mysqlTableName, databaseColumns, updatedValues, whereLogic, callback) {
 		// variable containing key value pairs to update from arrays passed
 		var keyValuePairs = '';
 
@@ -230,11 +288,11 @@ var mysql = {
 
 		// join arrays of column names and values to add by commas and add them to our query string
 		mysql.connect()
-			.query('UPDATE ' + mysqlTableName + ' SET ' + keyValuePairs + ' WHERE ' + (whereLogic || ''), 
+			.query('UPDATE ' + mysqlTableName + ' SET ' + keyValuePairs + ' WHERE ' + (whereLogic || '1 = 1'), 
 				// call user's callback function
 				function(err) {
-					// get err param if any and pass it to callback before calling
-					callback.call(mysql, err);
+					// get err param if any and pass it to callback before calling and exit
+					return callback.call(mysql, err);
 				});
 	}
 };
@@ -244,11 +302,19 @@ var mysql = {
  * entries from spreadsheet
 **/
 var database = {
-	entries:[],
-	raw_data:[],
-	last_reg:[],
-	last_new_reg:[],
-	global_values:[], 																	// global_values[0] holds company name data
+	// define fields and flags
+	populated 		: false,												// indicates whether database has been populated by external bank of data (through mysql or excel)
+	entries 		: [],
+	raw_data 		: [],
+	last_reg 		: [],
+	last_new_reg 	: [],
+	global_values 	: [], 													// global_values[0] holds company name data
+
+	// define statistics object, holds data analysis information
+	statistics		: {
+		average 	: 0, 													// holds value for average amount of visitors per event
+		averageNew 	: 0 													// holds value for average amount of new visitors per event
+	},
 
 	add:function(entry) {
 		// if we are passed an array of arrays, assume data came from parsing an excel spreadsheet
@@ -405,8 +471,9 @@ var database = {
 		// add entry to the main database
 		database.add(entry);
 
-		// store entry in the last_new_reg array of recently stored 'new' entries
+		// store entry in the last_new_reg array of recently stored 'new' entries as well as normal last_reg list
 		database.last_new_reg.push(entry);
+		database.last_reg.push(entry);
 	},
 	remove:function(entry) {
 		if(entry) {
@@ -648,8 +715,9 @@ http.createServer(function(req, res) {
  * @param eventName	= {String} containing current event's name assigned through the client by user
 **/
 function addToMysqlEventsTableUsingName(eventName) {
-	// now that a name for this event has been passed, assign in to our mysql object
-	mysql.eventTableName = eventName;
+	// now that a name for this event has been passed, assign in to our mysql object, if eventName is null or
+	// undefined, use default name of global_date.
+	mysql.eventTableName = eventName || global_date;
 	// check to see if database has already been added to events table in mysql server
 	mysql.connect()
 		.query('SELECT * FROM events WHERE table_name = \'' + global_date + '\'', function(err, rows, fields) {
@@ -661,11 +729,20 @@ function addToMysqlEventsTableUsingName(eventName) {
 
 			// if success, determine whether table has indeed been added to events table before
 			if(rows.length) {
+				// ensuring an event name was already assigned in a previous server session throughout the same event, restore
+				// that name...
+				if(!eventName) {
+					mysql.eventTableName = rows[0].event_name;
+				}
+
+				// ...else if an eventName @param is passed, assume intent is to actually update event's name,
+				// if not, use existing name instead of default global_date
+
 				mysql.update(
 
 					'events', 
 					['event_name', 'total', 'total_new'], 
-					[eventName, (database.getRegistered().length + database.getRegisteredNew().length), database.getRegisteredNew().length], 
+					[mysql.eventTableName, (database.getRegistered().length), database.getRegisteredNew().length], 
 
 					// add 'where' conditional logic
 					'table_name = "' + global_date + '"', 
@@ -678,8 +755,9 @@ function addToMysqlEventsTableUsingName(eventName) {
 					}
 
 					// log success
-					console.log('successfully renamed table ' + global_date + ' to ' + eventName + ' in mysql events table.');
+					console.log('successfully renamed table ' + global_date + ' to ' + mysql.eventTableName + ' in mysql events table.');
 				});
+
 			} else {
 				// if table has never been registered with an event name, register it, adding default (global_date) name,
 				// associating that with user-generated event_name, total number of registered entries so far, and total new entries
@@ -687,22 +765,31 @@ function addToMysqlEventsTableUsingName(eventName) {
 
 					'events', 
 					['table_name', 'event_name', 'total', 'total_new'], 
-					[global_date, eventName, (database.getRegistered().length + database.getRegisteredNew().length), database.getRegisteredNew().length], 
+					[global_date, mysql.eventTableName, (database.getRegistered().length + database.getRegisteredNew().length), database.getRegisteredNew().length], 
 
 					function(err) {
 					// check for errors
 					if(err) {
 						// log error and exit
 						return console.log('An error occurred adding event-table ' + 
-							global_date + ' with name ' + eventName + ' to the mysql server -> ' + err);
+							global_date + ' with name ' + mysql.eventTableName + ' to the mysql server -> ' + err);
 					}
 
 					// if no errors advertise success to console
-					console.log('successfully added table ' + global_date + ' with name ' + eventName + ' to mysql events table ');
+					console.log('successfully added table ' + global_date + ' with name ' + mysql.eventTableName + ' to mysql events table ');
 				});
 			}
 
 		});
+}
+
+/**
+ * 
+ *
+ * @param callback 		 	= {Function} 	to be called when mysql database query is complete.
+**/
+function importDataTablesFromMysql(callback) {
+
 }
 
 /**
@@ -729,6 +816,12 @@ function populateDatabaseFromMysql(callback) {
 		rows.forEach(function(row, index) {
 			database.add(row);
 		});
+
+		// tell program local database has data
+		database.populated = true;
+
+		// emit event to fire when database has been populated
+		scanner.emit('databasepopulated');
 
 		//call passed callback function
 		callback.call(mysql);
@@ -763,6 +856,12 @@ function populateDatabaseFromSpreadsheet(callback) {
 			database.add(data[i]);
 		}
 
+		// tell program local database has data
+		database.populated = true;
+
+		// emit event to fire when database has been populated
+		scanner.emit('databasepopulated');
+
 		// if callback function, call it with general context
 		if(typeof callback == 'function') {
 			callback.call(this);
@@ -776,7 +875,7 @@ function populateDatabaseFromSpreadsheet(callback) {
 		database.setRawData(data);
 
 		// Log to database that database has been populated and app is ready.
-		console.log('Database loaded. Waiting for scanner...');
+		console.log('local database has been populated from spreadsheet.');
 	});
 };
 
@@ -1134,9 +1233,10 @@ function generateOutputMysqlTable() {
 					// and also tell program table now exists
 					mysql.eventTableCreated = true;
 
-					// index table and see which entries from database exist on it (done in case application is restarted more than once in the same event)
+					// index event's table and see which entries from database exist on it (done in case application is restarted more than once in the same event)
+					// update local database's entries with data from mysql table's entries
 					mysql.connect()
-						.query('SELECT * FROM ' + global_date, function(err, rows, fields) {
+						.query('SELECT * FROM ' + mysql.eventTableName, function(err, rows, fields) {
 							// check for errors
 							if(err) {
 								return callback.call(this, '[Fatal]: An error occurred attempting to check previously stored data in mysql event table -> ' + err);
@@ -1156,17 +1256,44 @@ function generateOutputMysqlTable() {
 										// ...set its flag indicating that its added to current event table in mysql server to true
 										entry[0].addedToCurrentMysqlEventTable = true;
 
-										// since entry is already added to current event's mysql table, mark it as registered
-										entry[0].registered = true;
+										// populate entry caches to let program know entry is indeed newly registered
+										if(row.is_new) {
+											// register entry as new
+											database.registerNew(entry[0]);
+										} else {
+											// register entry as existing
+											database.register(entry[0]);
+										}
 									}									
 								});
 							}
 
-							// add table with default name (global_name) to events table in mysql server
-							addToMysqlEventsTableUsingName(global_date);
+							// calculate data averages and analysis
+
+							// select all table entries from 'events' table to gather previous data
+							mysql.selectFrom('events', ['*'], 'table_name != "' + global_date + '"', function(err, rows, fields) {
+								if(err) {
+									// log errors
+									return console.log('An error occurred selecting events from mysql database -> ' + err);
+								}
+
+								// iterate through events adding its total amount of guests to local database's average (recording total)
+								rows.forEach(function(row) {
+									database.statistics.average += row.total;
+									database.statistics.averageNew += row.total_new;
+								});
+
+								// calculate actual averages by dividing total result by amount of rows
+								database.statistics.average 		/= rows.length;
+								database.statistics.averageNew	/= rows.length;
+							});
+
+							// add table with default name (global_name) to events table in mysql server null
+							// value makes it so that if table entry exists, existing name is used instead of default
+							addToMysqlEventsTableUsingName(null);
 						});
 				});
-
+	
 		}
 
 		// if no error fetching data, check to see if any data in database. don't take into account if table has been created or not

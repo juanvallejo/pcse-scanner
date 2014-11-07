@@ -11,34 +11,76 @@
     src: url(fonts/Source_Code_Pro/SourceCodePro-Regular.ttf);
 }
 
+
 html,body {
-width:100%; height:100%;
-}
-body {
-background:#00496b url(bg.jpg) no-repeat 0 0 fixed; background-size:cover; font:400 16px 'Gabriela',arial,sans-serif; color:rgb(85,85,85); float:left;
-overflow:hidden;
+	height:100%;
+	width:100%;
 }
 
+body {
+	background:white url(bg.png) no-repeat 0 0 fixed;
+	background-size:cover;
+	color:rgb(85,85,85);
+	float:left;
+	font:400 16px 'Helvetica Neue','Gabriela',arial,sans-serif;
+	overflow:hidden;
+}
+
+
 #overlay {
-width:100%; height:100%; position:fixed; left:0; top:0; background:rgba(0,0,0,0.5); display:none;
+	background:rgba(0,0,0,0.5);
+	display:none;
+	height:100%;
+	left:0;
+	position:fixed;
+	top:0;
+	width:100%; 
 }
+
 #main-panel {
-position:relative; background:rgba(0,0,0,0.3); border-top:0; min-height:60%;
+	background:rgba(0,0,0,0.53);
+	border-top:0;
+	min-height:100%;
+	position:relative;
 }
+
 	#main-panel .fx-shadow-overlay {
 	width:100%; height:100%; position:absolute; top:0; left:0; min-height:100px; box-shadow:inset 1px 10px 100px rgba(0,0,0,0.7);
 	}
+
+	#stats1 {
+		position:relative;
+	}
+
+		#stats1 > svg {
+			display:block;
+			position:absolute;
+			top:0;
+			width:100%;
+		}
+
 	#wrapper {
 	width:600px; position:relative; margin:0 auto;
 	}
+
 		#brand {
-		width:100%; margin:20% 0 0 0; color:rgb(246,255,245); opacity:0.89; text-align:center; text-shadow:0 1px 0 rgba(0,0,0,0.8);
+			color:rgb(246,255,245);
+			margin:20% 0 0 0;
+			text-align:center;
+			text-shadow:0 -1px 0 rgba(0,0,0,0.8);
+			width:100%; opacity:0.89;
 		}
 			#brand .logo {
-			float:left; width:100%; font-size:3.5em; color:rgba(0,27,47,0.01); text-shadow:0 1px 0 rgba(177,222,255,0.3),0 -1px 0 rgba(0,12,22,0.6);
+				color:rgba(255,255,255,0.7);
+				float:left; width:100%; 
+				font:100 3.5em 'Helvetica Neue';
+				text-shadow:0 1px 0 rgba(0,0,0,0.1), 0 -1px 0 rgba(255,255,255,0.01);
 			}
 			#brand .tagline {
-			margin:1px 0 0 0; font-size:1.5em; color:rgba(0,27,47,0.1); text-shadow:0 1px 0 rgba(177,222,255,0.3),0 -1px 0 #001b2f;
+			color:rgba(0,27,47,0.1);
+			font-size:1.5em;
+			margin:1px 0 0 0;
+			text-shadow:0 1px 0 rgba(177,222,255,0.3), 0 -1px 0 #001b2f;
 			}
 				#brand .tagline span {
 				font-size:0.5em;
@@ -63,46 +105,91 @@ position:relative; background:rgba(0,0,0,0.3); border-top:0; min-height:60%;
 				#wrapper .panel-content .panel-content-button:active {
 				border-top-color:rgba(0,0,0,0.2); border-left:1px solid rgba(0,0,0,0.2); opacity:0.6;
 				}
+		
+		#out {
+			color:rgba(255,255,255,0.8);
+			font:100 2.5em 'Helvetica Neue';
+			font-size:1.2em; text-align:center; width:100%; margin-top:-1%;
+			letter-spacing:1px;
+			margin:30% 0 0 0 ;
+			opacity:0.6;
+			text-shadow:0 1px 0 rgba(0,12,22,0.5);
+		}
+
 #footer {
-background:rgba(0,0,0,0.35); border-top:1px solid rgba(255,255,255,0.08); border-bottom:0; font-size:0.8em; text-align:center; padding-bottom:0;
-font-family:'Open Sans',sans-serif; color:rgba(0,27,47,0.1); text-shadow:0 1px 0 rgba(177,222,255,0.3),0 -1px 0 #001b2f; min-height:25%;
+background:rgba(0,0,0,0.57); border-top:1px solid rgba(255,255,255,0.08); border-bottom:0; font-size:0.8em; text-align:center; padding-bottom:0;
+font:200 0.8em 'Helvetica Neue'; color:rgba(255,255,255,0.4); text-shadow:0 1px 0 rgba(0,0,0,0.5); min-height:25%; padding-top:22px;
 }
 	#footer p {
 	/*margin-bottom:10px;*/
 	}
 
+.stats {
+	background:transparent;
+	background-size:230px;
+	height:230px;
+	margin:115px auto 0 auto;
+	width:230px;
+}
+
+	.stats .stats-out {
+		color:rgba(255,255,255,0.45);
+		font:100 3.8em 'Helvetica Neue';
+		height:230px;
+		position:relative;
+		text-align:center;
+		top:80px;
+		width:100%;
+	}
+
+
 .panel {
-width:100%; float:left; min-height:100px; background:rgba(0,0,0,0.4); border-bottom:1px solid rgba(0,0,0,0.3); border-top:1px solid rgba(255,255,255,0.07);
+width:100%; float:left; min-height:50px; background:rgba(0,0,0,0.6); border-bottom:1px solid rgba(0,0,0,0.3); border-top:1px solid rgba(255,255,255,0.07);
 }
 	.panel-content {
-		margin:4% auto; 
-		position:relative;
+		margin:3% auto; 
 		width:500px;
 	}
 		.panel-content .editor {
-		width:100%; background:rgba(0,0,0,0.29); border:1px solid rgba(0,0,0,0.8); border-radius:7px; box-shadow:0 1px 0 rgba(255,255,255,0.1);
+			width:100%; /*background:rgba(0,0,0,0.29); border:1px solid rgba(0,0,0,0.8); border-radius:7px; box-shadow:0 1px 0 rgba(255,255,255,0.1);*/
 		}
 			.panel-content .editor .editor-wrapper {
 				border-radius:inherit;
-				box-shadow:inset 0 2px 8px rgba(0,0,0,0.55);
-				border-top:1px solid rgba(0,0,0,0.6); 
-				padding:10px;
+				padding:50px 0 0 0;
 				width:96%; 
 			}
 				.panel-content .editor .editor-wrapper .editor-content {
-				width:100%; min-height:100px; border-radius:inherit; color:rgba(255,255,255,0.66); font:400 0.9em 'Open Sans',monospace; line-height:1.7em; position:relative;
+					border-radius:inherit;
+					font:400 0.9em 'Open Sans', monospace;
+					line-height:1.7em;
+					position:relative;
+					width:100%;
 				}
 					.panel-content .editor .editor-wrapper .editor-content #sid {
-					font-size:1.7em; text-align:center; left:50%; top:50%; margin:-40px 0 0 -200px; position:absolute; width:400px; color:rgba(255,255,255,0.5); padding-top:25px;
+						font-size:1.7em;
+						left:50%;
+						margin:-40px 0 0 -200px;
+						padding-top:25px;
+						position:absolute;
+						text-align:center;
+						top:50%;
+						width:400px;
 					}
 						.panel-content .editor .editor-wrapper .editor-content #sid-input {
-						font-size:1.7em; text-align:center; left:50%; top:50%; margin:-40px 0 0 -200px; position:absolute; width:400px; color:rgba(255,255,255,0.5); padding-top:25px;
-						border:0; background:transparent;
+							background:transparent;
+							border:0;
+							color:rgba(255,255,255,0.75);
+							font:100 3em 'Helvetica Neue';
+							left:50%;
+							margin:-40px 0 0 -300px;
+							padding:0;
+							position:absolute;
+							text-align:center;
+							top:50%;
+							width:600px;
+							opacity:0.8;
 						}
-		.panel-content #out {
-		font-size:1.2em; text-align:center; width:100%; color:rgba(0,0,0,0.85); margin-top:-1%;
-		text-shadow:0 1px 0 rgba(177,222,255,0.1),0 -1px 0 #000c16;
-		}
+		
 		.panel-content-section {
 		width:100%; margin-bottom:60px; padding:10px;
 		}

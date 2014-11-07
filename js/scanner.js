@@ -483,8 +483,8 @@ var database = {
 	setRawData:function(data) {
 		raw_data = data;
 	},
-	size:function() {
-		return database.entries.length;
+	size:function(a) {
+		return a == 'registered' ? database.getRegistered().length : database.entries.length;
 	}
 };
 
@@ -664,7 +664,7 @@ http.createServer(function(req, res) {
 					res.end('ERR: Unimplemented command.');
 				} else if(command[1] == 'event') {
 					if(command[2] == 'name') {
-						database.global_values[0] = decodeURIComponent(command[3]+' ('+global_date+')');
+						database.global_values[0] = decodeURIComponent(command[3] + ' (' + global_date + ')');
 
 						// add event with its new name to the 'events' table in the mysql database
 						addToMysqlEventsTableUsingName(decodeURIComponent(command[3]));
@@ -684,8 +684,20 @@ http.createServer(function(req, res) {
 					} else {
 						res.end('ERR: Invalid event action.');
 					}
+				} else if(command[1] == 'request') {
+					// data for statistics is being requested
+					if(command[2] == 'stats') {
+						// call method pertaining to database
+						res.writeHead(200, {'Content-type':'application/json'});
+						res.end(JSON.stringify({
+							data : {
+								stats : database.statistics,
+								length : database.size('registered')
+							}
+						}));
+					}
 				} else {
-					res.end('ERR: Invalid command.');
+					res.end('ERR: Invalid command [' + command[1] + ']');
 				}
 			});
 		} else {
@@ -1286,6 +1298,7 @@ function generateOutputMysqlTable() {
 								// calculate actual averages by dividing total result by amount of rows
 								database.statistics.average 		/= rows.length;
 								database.statistics.averageNew	/= rows.length;
+
 							});
 
 							// add table with default name (global_name) to events table in mysql server null

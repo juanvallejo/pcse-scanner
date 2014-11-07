@@ -26,18 +26,14 @@ var App = {
 	resize:function(doc) {
 		this.doc = doc;
 		var mainPanel = doc.getElementById("main-panel");
-		mainPanel.style.height = (window.innerHeight * 0.60)+"px";
+		mainPanel.style.height = (window.innerHeight * 0.70)+"px";
 
 		var editorPanel = doc.getElementById("editorPanel");
-		editorPanel.style.height = (window.innerHeight * 0.15)+"px";
+		editorPanel.style.height = (window.innerHeight * 0.11)+"px";
 
-		var footer = doc.getElementById("footer");
-		footer.style.height = (window.innerHeight * 0.25)+"px";
-
-		this.addResizeListener(mainPanel,'height',0.60,true);
-		this.addResizeListener(editorPanel,'height',0.15,false);
-		this.addResizeListener(footer,'height',0.25,false);
+		this.addResizeListener(mainPanel, 'height', 0.60, true);
 	},
+
 	init:function() {
 
 	}
@@ -46,6 +42,45 @@ var App = {
 window.App = App;										// add object to global scope
 
 })(window);
+
+var events = {
+	// contains names of events and corresponding callbacks
+	_events:{},
+
+	/**
+	 * calls every function assigned for each event
+	 *
+	 * @eventName {String} key assigned to callback function array
+	 * @paramArray {Array} an array of parameters to be passed to event callback when event is fired
+	 */
+	emit:function(eventName, paramArray) {
+		// make sure an array has been initialized for current event key
+		events._events[eventName] = events._events[eventName] || [];
+
+		// call each of the event's callbacks
+		events._events[eventName].forEach(function(e) {
+			// call each event's callback
+			e.apply(this, paramArray);
+		});
+	},
+
+	/**
+	 * adds callback to array list corresponding to event
+	 *
+	 * @eventName {String} key assigned to callback function array
+	 * @paramArray {Array} an array of parameters to be passed to event callback when event is fired
+	 */
+	on:function(eventName, callback) {
+		// check if event has been assigned before
+		if(!events._events[eventName]) {
+			// initialize array for new event
+			events._events[eventName] = [];
+		}
+
+		// add callback to event callback array
+		events._events[eventName].push(callback);
+	}
+};
 
 /**
  * Calls functions in the App.events.resize[] Array any time
@@ -76,8 +111,24 @@ window.addEventListener('load', function() {
 		registered:0
 	};
 
-	var out = document.getElementById('out');			// define interface 'console' output for errors and alerts
-	var sid = document.getElementById('sid-input');		// define variable to hold main scanner input element
+	var out = document.getElementById('out');				// define interface 'console' output for errors and alerts
+	var sid = document.getElementById('sid-input');			// define variable to hold main scanner input element
+	var statsOut = document.getElementById('stats1Out');
+
+	// define main circle containing amount of current registrants
+	var statsOutProgress = new ProgressBar.Circle('#stats1', {
+		// circle loading bar properties
+		color:'#cbfca0',
+		duration:1200,
+		easing:'easeIn',
+		strokeWidth:2,
+		trailColor:'rgba(203,252,160,0.09)'
+
+	});
+
+	// reset circle
+	statsOutProgress.set(0);
+
 
 	//focus the main input element
 	sid.focus();
@@ -104,7 +155,16 @@ window.addEventListener('load', function() {
 	 */
 	sid.write = function(text) {
 		out.innerHTML = text || '';
-		out.style.marginTop = ((-out.clientHeight / 2) + (out.clientHeight * 0.15))+'px';
+	};
+
+	/**
+	 * Writes passed string to 'out' html element and resizes the 'out' element's
+	 * top margin according to its new size containing the body of text passed.
+	 * 
+	 * @param text = {String} message containing text to output to interface console
+	 */
+	sid.writeToStatsCounterOne = function(text) {
+		statsOut.innerHTML = text || '';
 	};
 
 	/**
@@ -122,11 +182,62 @@ window.addEventListener('load', function() {
 				if(this.responseText == 'success') {
 					callback.call(this);	
 				} else {
-					callback.call(this,responseText);
+					callback.call(this, this.responseText);
 				}
 			}
 		});
 	};
+
+	/**
+	 * init server requests to fetch previously obtained data for this event
+	 */
+
+	 // fetch current size of database
+	 sid.command('/request/stats', function(data) {
+	 	events.emit('serverStatsReceived', [JSON.parse(data).data]);
+	 });
+
+
+	/**
+	 * define user emitted events
+	 */
+
+	// event fires after a user is registered with the server's database
+	events.on('register', function() {
+		// update the counter of total people signed in
+		stats.total++;
+
+		// animate and increase registrant counter
+		statsOutProgress.animate((stats.total / stats.average), {
+
+			duration: 800
+		
+		}, function() {
+			// once load bar is done with animation
+			// write current number of registrants to screen
+			sid.writeToStatsCounterOne(stats.total);
+
+		});
+	});
+
+	// event fires after a response from server is received with statistical data
+	events.on('serverStatsReceived', function(data) {
+		// animate and increase registrant counter
+		statsOutProgress.animate((data.length / data.stats.average), {
+
+			duration: 800
+		
+		}, function() {
+			// once load bar is done with animation
+			// write current number of registrants to screen
+			sid.writeToStatsCounterOne(data.length);
+
+			// log data received from server
+			stats.total = data.length; 
+			stats.average = data.stats.average;
+			stats.averageNew = data.stats.averageNew;
+		});
+	});
 
 	/**
 	 * Detects when a key is pressed while main input field
@@ -321,7 +432,7 @@ window.addEventListener('load', function() {
 								sid.lname = sid.value.split(' ')[1];
 
 								// prompt student to enter the next dataState value (year)
-								sid.placeholder = 'Enter your year to continue...';
+								sid.placeholder = 'Enter graduating year to continue...';
 
 								// reset input value
 								sid.value = '';
@@ -372,9 +483,6 @@ window.addEventListener('load', function() {
 							// set sid.email to current sid value to save entered value (email)
 							sid.email = sid.value;
 
-							// advertise that registration process is over for new entry
-							sid.placeholder = 'Thanks ' + sid.fname + ', you\'ve been signed in.';
-
 							// reset input value
 							sid.value = '';
 
@@ -420,13 +528,11 @@ window.addEventListener('load', function() {
 										// output message to the interface console
 										sid.error('You cannot register more than once per event.');
 									} else {
-										// update the counter of total people signed in
-										stats.total++;
-
 										// output welcome message to the input field
 										sid.value = 'Welcome, ' + student.fname + ' ' + student.lname;
 
-										sid.write('There are now a total of '+stats.total+' people at this event.');
+										// broadcast 'register' event
+										events.emit('register', [stats.total]);
 									}
 								} else {
 
@@ -441,7 +547,7 @@ window.addEventListener('load', function() {
 									sid.sid 		= student.id; 				// store student id in our main input field object
 
 									// output registration message to the interface console
-									sid.write('"You must be new here..." --Gene Wilder');
+									sid.write('Welcome. Follow the steps above to register.');
 								}
 							}
 						});
@@ -459,8 +565,11 @@ window.addEventListener('load', function() {
 				sid.state = 1;
 				sid.reg = false;
 				sid.value = '';
+
+				// output default message
 				sid.placeholder = 'Type your ID to continue...';
 
+				// clear input
 				sid.write('');
 			}
 		} else {

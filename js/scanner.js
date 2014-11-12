@@ -106,7 +106,7 @@ function parseBarcode(code) {
 	if(search.length) {
 		console.log('Welcome back, '+search[0].fname+' '+search[0].lname+'!');
 	} else {
-		console.log('You must be new here... ('+code+')');
+		console.log('You must be new here... ('+ code +')');
 	}
 };
 
@@ -212,6 +212,26 @@ var mysql = {
 	},
 
 	/**
+	 * deletes entries from table where whereLogic applies
+	 *
+	 * @param mysqlTableName  	= {Object}		entry object from local 'database' object
+	 * @param whereLogic 		= {String} 		containing equality to use to target the selection of a specific row
+	 * @param callback 			= {Function} 	to call after operation has completed successfully
+	 *
+	 * for data protection, if @param whereLogic is 'null', nothing is deleted / returned
+	**/
+	deleteFrom : function(mysqlTableName, whereLogic, callback) {
+		if(whereLogic) {
+			// perform query only if whereLogic has been passed
+			mysql.connect()
+				.query('DELETE FROM ' + mysqlTableName + ' WHERE ' + (whereLogic || '1 = 1'), callback);
+		} else {
+			// fail and exit function with error
+			callback.call(this, 'ERR: (mysqldatabasedeletionerror): no \'WHERE\' condition applies for selected logic.');
+		}
+	},
+
+	/**
 	 * safely closes the mysql connection
 	**/
 	end : function() {
@@ -311,9 +331,11 @@ var database = {
 	global_values 	: [], 													// global_values[0] holds company name data
 
 	// define statistics object, holds data analysis information
-	statistics		: {
-		average 	: 0, 													// holds value for average amount of visitors per event
-		averageNew 	: 0 													// holds value for average amount of new visitors per event
+	statistics			: {
+		average 		: 0, 												// holds value for average amount of visitors per event
+		averageNew 		: 0, 												// holds value for average amount of new visitors per event
+		deletedCount 	: 0, 												// holds value for amount of visitors deleted
+		registeredCount : 0 												// holds count for amount of visitors registered
 	},
 
 	add:function(entry) {
@@ -460,6 +482,9 @@ var database = {
 			//tell program entry is now	registered
 			entry.registered = true;
 		}
+
+		// update statistical counter
+		database.statistics.registeredCount++;
 	},
 	registerNew:function(entry) {
 		// tell program entry is now registered
@@ -474,17 +499,57 @@ var database = {
 		// store entry in the last_new_reg array of recently stored 'new' entries as well as normal last_reg list
 		database.last_new_reg.push(entry);
 		database.last_reg.push(entry);
+
+		// update statistical counter
+		database.statistics.registeredNewCount++;
 	},
-	remove:function(entry) {
+	remove:function(entry, callback) {
+		// ensure we have a callback function to call
+		callback = callback || function() {};
+
+		// if entry param exists
 		if(entry) {
-			entry.deleted = true;
+			// if the entry exists in the database server, remove it from there
+			if(entry.registered && entry.addedToCurrentMysqlEventTable && !entry.deleted) {
+				// delete row from mysql table for current event
+				mysql.deleteFrom(global_date, 'student_id = ' + entry.id, function(err) {
+					if(err) {
+						// fail and exit function with error message
+						return callback.call(this, err);
+					}
+
+					// tell database entry no longer exists in the mysql table
+					entry.addedToCurrentMysqlEventTable = false;
+
+					// tell database entry has been deleted
+					entry.deleted = true;
+
+					// remove from registered counter
+					database.statistics.registeredCount--;
+
+					// increase statistical deletion counter
+					database.statistics.deletedCount++;
+
+					// exit function successfully
+					callback.call(this);
+				});
+			} else {
+				// if entry was already deleted
+				if(entry.deleted) {
+					// fail and exit function with error message
+					return callback.call(this, 'The entry with id ' + entry.id + ' has already been deleted');
+				}
+			}
+		} else {
+			// fail and exit function with error message
+			return callback.call(this, 'No entry was passed for deletion');
 		}
 	},
 	setRawData:function(data) {
 		raw_data = data;
 	},
 	size:function(a) {
-		return a == 'registered' ? database.getRegistered().length : database.entries.length;
+		return a == 'registered' ? database.statistics.registeredCount : database.entries.length;
 	}
 };
 
@@ -671,13 +736,52 @@ http.createServer(function(req, res) {
 
 						// send success message back to client
 						res.end('success');
-					} else if(command[2] == 'delete') {						
+					} else if(command[2] == 'delete') {
+						// handles deletion of records				
 						if(command[3] == 'top') {
 							database.remove(database.getRegistered()[0]);
 							res.end('success');
 						} else if(command[3] == 'bottom') {
-							database.remove(database.getRegistered()[database.getRegistered().length-1]);
-							res.end('success');
+							// initialize record to delete with last item on database
+							var recordToDelete = database.getRegistered()[database.getRegistered().length - 1];
+							// initialize recordToDeleteCounter
+							var numberOfDeletedRecords = 0;
+
+							// iterate through records from the bottom of the list until we find next one that hasn't been deleted
+							while(!recordToDelete.deleted) {
+								// increment tally of already deleted records
+								numberOfDeletedRecords++;
+
+								// assign next record from bottom as record to delete
+								recordToDelete = database.getRegistered()[database.getRegistered().length - 1 - numberOfDeletedRecords];
+							}
+
+							// tell database to remove the last record on the list
+							database.remove(database.getRegistered()[database.getRegistered().length - 1 - numberOfDeletedRecords], function(err) {
+								if(err) {
+									// advertise error
+									console.log('An error occurred deleting a database record -> ' + err);
+
+									// send back error response as JSON object to client and exit
+									return res.end(JSON.stringify({
+										error : err
+									}));
+								}
+
+								console.log(database.getRegistered()[database.getRegistered().length-1].deleted);
+
+								// if success, advertise
+								console.log('successfully deleted entry with id ' + database.getRegistered()[database.getRegistered().length-1].id);
+
+								// send back successful response as JSON object to client
+								return res.end(JSON.stringify({
+									data : {
+										error : false,
+										length : database.statistics.registeredCount,
+										stats : database.statistics
+									}
+								}));
+							});
 						} else {
 							res.end('ERR: Invalid event action.');
 						}
@@ -754,7 +858,7 @@ function addToMysqlEventsTableUsingName(eventName) {
 
 					'events', 
 					['event_name', 'total', 'total_new'], 
-					[mysql.eventTableName, (database.getRegistered().length), database.getRegisteredNew().length], 
+					[mysql.eventTableName, (database.statistics.registeredCount), database.getRegisteredNew().length], 
 
 					// add 'where' conditional logic
 					'table_name = "' + global_date + '"', 
@@ -1065,9 +1169,10 @@ function exportDatabase(type, fname, callback) {
 				);
 			}
 
-			// if entry has been registered in to the current event and it hasn't yet added to table containing list
-			// of students who showed up to event, insert it
-			if(entry.registered && !entry.addedToCurrentMysqlEventTable) {
+				
+			// if entry has not been 'deleted' and it has been registered in to the current event
+			// and it hasn't yet added to table containing list of students who showed up to event, insert it
+			if(entry.registered && !entry.addedToCurrentMysqlEventTable && !entry.deleted) {
 				// log that we are adding registered student to the mysql database
 				console.log('adding registered entry with id ' + entry.id + ' to the current event table in mysql server.');
 

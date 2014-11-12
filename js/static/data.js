@@ -230,7 +230,7 @@ window.addEventListener('load', function() {
 		}, function() {
 			// once load bar is done with animation
 			// write current number of registrants to screen
-			sid.writeToStatsCounterOne(data.length);
+			sid.writeToStatsCounterOne(data.length || '0');
 
 			// log data received from server
 			stats.total = data.length; 
@@ -308,21 +308,37 @@ window.addEventListener('load', function() {
 				} else if(sid.value.match(/^(delete|remove|erase|undo)(\ )+(the|())([a-z0-9\ ]+)(people|entr(y|ies)|row(s|)|person(s|())|name(s|)|student(s|))/)) {
 					if(sid.value.match(/(last|first|latest)([\ ]+)(two|three|four|five|six|seven|eight|nine|ten)?(\ )*(new)?(\ )*(person|student|name|entry|row)/gi)) {
 						if(sid.value.match(/(latest)/gi) || sid.value.match(/(last)([\ ]+)(new)?(\ )*(person|student|name|entry|row)/gi)) {
-							//remove the last person signed in
+							//remove the last new person signed in
 							if(sid.value.match(/(new)/gi)) {
-								sid.command('/event/delete/bottom/1/new',function(err) {
+								sid.command('/event/delete/bottom/1/new', function(err) {
 									if(err) {
-										return sid.error('The event requested could not be removed: '+err);
+										// adverise error to client console
+										console.log('The event requested could not be removed -> ' + err);
+
+										// log error to gui console and exit function
+										return sid.error(err);
 									}
 
+									// log success to gui console
 									sid.write('The last new person signed in has been removed.');
 								});
+
+							// remove the last person to have signed in
 							} else {
-								sid.command('/event/delete/bottom/1',function(err) {
+								// send request to server to server to delete last added entry
+								sid.command('/event/delete/bottom/1', function(err, data) {
 									if(err) {
-										return sid.error('The event requested could not be removed: '+err);
+										// adverise error to client console
+										console.log('The event requested could not be removed -> ' + err);
+
+										// log error to gui console and exit function
+										return sid.error(err);
 									}
 
+									// update server stats locally
+									events.emit('serverStatsReceived', JSON.parse(data).data);
+
+									// log success to gui console
 									sid.write('The last person signed in has been removed.');
 								});
 							}

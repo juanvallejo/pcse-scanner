@@ -454,7 +454,7 @@ window.addEventListener('load', function() {
 						// check which 'input' stage the new user is on
 						if(sid.dataState == 1) {
 							// check to see that a first and last name are entered
-							if(sid.value.match(/^[a-z]+(\ )[a-z]+/gi)) {
+							if(sid.value.match(/^[a-z\'\-]+(\ )[a-z\'\-]+/gi)) {
 								// collect stuname and move on to next data state
 								sid.dataState = 2;
 
@@ -515,8 +515,9 @@ window.addEventListener('load', function() {
 							// set sid.email to current sid value to save entered value (email)
 							sid.email = sid.value;
 
-							// reset input value
+							// reset input and placeholder values
 							sid.value = '';
+							sid.placeholder = 'Scan your ID';
 
 							// format outgoing data string with new student information
 							data = 	'student_id='	+ sid.sid 		+ 			// contains student id
@@ -535,6 +536,9 @@ window.addEventListener('load', function() {
 
 							// clear dataState flag to indicate no registration prompt is going to be shown
 							sid.dataState = null;
+
+							// advertise registration was successful
+							sid.write('You have been successfully registered!');
 
 							// if information is entered successfully, update registrant counter
 							stats.registered++;

@@ -742,6 +742,10 @@ http.createServer(function(req, res) {
 							database.remove(database.getRegistered()[0]);
 							res.end('success');
 						} else if(command[3] == 'bottom') {
+							// advertise command is not yet fully implemented
+							console.log('Unimplemented command called.');
+							return res.end('This command has not been implemented yet.');
+
 							// initialize record to delete with last item on database
 							var recordToDelete = database.getRegistered()[database.getRegistered().length - 1];
 							// initialize recordToDeleteCounter

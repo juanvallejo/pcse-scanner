@@ -204,20 +204,36 @@ window.addEventListener('load', function() {
 
 	// event fires after a user is registered with the server's database
 	events.on('register', function() {
+		// define animation's settings object
+		var animationSettings = {
+			// duration of animation
+			duration: 800
+		};
+
 		// update the counter of total people signed in
 		stats.total++;
 
-		// animate and increase registrant counter
-		statsOutProgress.animate((stats.total / stats.average), {
+		// if we have more people than the average, or a counter overflow
+		if((stats.total / stats.average) >= 1) {
+			// modify counter animation to display different color
+			animationSettings.from 	= { color: '#cd3700' };
+			animationSettings.to 	= { color: '#cd3700' };
 
-			duration: 800
-		
-		}, function() {
+			// add step function so animation recognizes new color-stop params
+			animationSettings.step 	= function(state, circle) {
+				// set stroke color to current 'to' or 'from' color
+				circle.path.setAttribute('stroke', state.color);
+			}
+		}
+
+		// animate and increase registrant counter
+		statsOutProgress.animate((stats.total / stats.average), animationSettings, function() {
 			// once load bar is done with animation
 			// write current number of registrants to screen
 			sid.writeToStatsCounterOne(stats.total);
 
 		});
+
 	});
 
 	// event fires after a response from server is received with statistical data
@@ -539,7 +555,7 @@ window.addEventListener('load', function() {
 									// check if the entry has already been updated with the server
 									if(student.alreadyRegistered) {
 										// output message to the input field
-										sid.value = 'You\'ve already been signed in!';
+										sid.value = 'You have already been signed in!';
 
 										// output message to the interface console
 										sid.error('You cannot register more than once per event.');

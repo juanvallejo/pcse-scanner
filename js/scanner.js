@@ -331,11 +331,12 @@ var database = {
 	global_values 	: [], 													// global_values[0] holds company name data
 
 	// define statistics object, holds data analysis information
-	statistics			: {
-		average 		: 0, 												// holds value for average amount of visitors per event
-		averageNew 		: 0, 												// holds value for average amount of new visitors per event
-		deletedCount 	: 0, 												// holds value for amount of visitors deleted
-		registeredCount : 0 												// holds count for amount of visitors registered
+	statistics				: {
+		average 			: 0, 											// holds value for average amount of visitors per event
+		averageNew 			: 0, 											// holds value for average amount of new visitors per event
+		deletedCount 		: 0, 											// holds value for amount of visitors deleted
+		registeredCount 	: 0, 											// holds count for amount of visitors registered
+		registeredNewCount 	: 0 											// holds count for amount of new visitors registered
 	},
 
 	add:function(entry) {
@@ -465,7 +466,9 @@ var database = {
 
 		return response;
 	},
-	register:function(entry) {
+
+	// callback returns pointer to recently registered entry
+	register:function(entry, callback) {
 		if(typeof entry == 'object') {
 			// tell program entry is now registered
 			entry.registered = true;
@@ -480,28 +483,59 @@ var database = {
 			})[0]);
 
 			//tell program entry is now	registered
-			entry.registered = true;
+			database.find({
+				id:entry
+			})[0].registered = true;
 		}
 
 		// update statistical counter
 		database.statistics.registeredCount++;
+
+		// make sure callback is of type function
+		callback = callback || function() {};
+		// call callback function to continue
+		callback.call(this, entry); 
 	},
+
+	/**
+	 * Registers an entry that did not previously exist in the mysql database
+	 */
 	registerNew:function(entry) {
-		// tell program entry is now registered
-		entry.registered = true;
+		// register the entry normally
+		database.register(entry, function(registeredEntry) {
+			// once it's registered, increase new count and add entry to new array
 
-		// tell program whether entry is new
-		entry.isNew = true;
+			// tell program whether entry is new
+			entry.isNew = true;
 
-		// add entry to the main database
-		database.add(entry);
+			// add entry to the main database
+			database.add(entry);
+			// store entry in the last_new_reg array of recently stored 'new' entries as well as normal last_reg list
+			database.last_new_reg.push(entry);
 
-		// store entry in the last_new_reg array of recently stored 'new' entries as well as normal last_reg list
-		database.last_new_reg.push(entry);
-		database.last_reg.push(entry);
+			// update statistical counter
+			database.statistics.registeredNewCount++;
+		});
+	},
+	
+	/**
+	 * Registers an entry that is new to the current event, but has already been added to the database previously.
+	 * Differs from registerNew method in that it doesn't 're-add' entry back into the local database object
+	 */
+	registerNewFromMysql:function(entry) {
+		// register the entry normally
+		database.register(entry, function(registeredEntry) {
+			// once it's registered, increase new count and add entry to new array
 
-		// update statistical counter
-		database.statistics.registeredNewCount++;
+			// tell program whether entry is new
+			registeredEntry.isNew = true;
+
+			// store entry in the last_new_reg array of recently stored 'new' entries as well as normal last_reg list
+			database.last_new_reg.push(registeredEntry);
+
+			// update statistical counter
+			database.statistics.registeredNewCount++;
+		});
 	},
 	remove:function(entry, callback) {
 		// ensure we have a callback function to call
@@ -1380,12 +1414,12 @@ function generateOutputMysqlTable() {
 										// populate entry caches to let program know entry is indeed newly registered
 										if(row.is_new) {
 											// register entry as new
-											database.registerNew(entry[0]);
+											database.registerNewFromMysql(entry[0]);
 										} else {
 											// register entry as existing
 											database.register(entry[0]);
 										}
-									}									
+									}								
 								});
 							}
 
@@ -1405,7 +1439,7 @@ function generateOutputMysqlTable() {
 								});
 
 								// calculate actual averages by dividing total result by amount of rows
-								database.statistics.average 		/= rows.length;
+								database.statistics.average 	/= rows.length;
 								database.statistics.averageNew	/= rows.length;
 
 							});

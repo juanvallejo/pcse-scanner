@@ -194,6 +194,7 @@ window.addEventListener('load', function() {
 
 	 // fetch current size of database
 	 sid.command('/request/stats', function(data) {
+	 	// emit event for when stats are received from our server
 	 	events.emit('serverStatsReceived', [JSON.parse(data).data]);
 	 });
 

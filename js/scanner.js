@@ -721,130 +721,137 @@ http.createServer(function(req, res) {
 			});
 		}
 	} else if(path == '/command') {
-		if(req.method == 'POST') {
-			var value = '';
+		
+		// check the type of request being made is a post
+		if(req.method != 'POST') {
+			return console.log('ERR: Invalid request.');
+		}
 
-			req.on('data',function(chunk) {
-				value += chunk;
-			});
-			req.on('end',function() {
-				// split command string into sub-commands
-				var command = value.split('/');					// [1] -> target / object to apply the command to
-																// [2] -> action to apply to target
-																// [3] -> data to use when applying action to target
+		var value = '';
 
-				if(command[1] == 'export') {
-					// override second command if mysql server is currently being used for data
-					// by exporting database we are simply updating new entries and registered students
-					exportDatabase((mysql.isConnected ? 'mysql' : command[2]), function(err) {
-						// check for errors
-						if(err) {
-							// send error message back to client and exit
-							return res.end('ERR: There was an error exporting the data: '+err);
+		req.on('data',function(chunk) {
+			value += chunk;
+		});
+
+		req.on('end',function() {
+			// split command string into sub-commands
+			var command = value.split('/');					// [1] -> target / object to apply the command to
+															// [2] -> action to apply to target
+															// [3] -> data to use when applying action to target
+
+			if(command[1] == 'export') {
+				// override second command if mysql server is currently being used for data
+				// by exporting database we are simply updating new entries and registered students
+				exportDatabase((mysql.isConnected ? 'mysql' : command[2]), function(err) {
+					// check for errors
+					if(err) {
+						// send error message back to client and exit
+						return res.end('ERR: There was an error exporting the data: '+err);
+					}
+
+					// advertise method of database export
+					console.log('database exported through command');
+
+					// send success message back to client
+					res.end('success');
+				});
+
+				// generate a mysql table with all student information to easily add to spreadsheet
+				generateOutputMysqlTable();
+
+				// update mysql 'events' table with current entry counts
+				addToMysqlEventsTableUsingName(mysql.eventTableName);
+
+			} else if(command[1] == 'query') {
+				// send error back to client
+				res.end('I am not allowed to index the database yet.');
+			} else if(command[1] == 'create') {
+				res.end('ERR: Unimplemented command.');
+			} else if(command[1] == 'event') {
+
+				if(command[2] == 'name') {
+					// set global event name,
+					// add event with its new name to the 'events' table in the mysql database
+					database.global_values[0] = decodeURIComponent(command[3] + ' (' + global_date + ')');
+					addToMysqlEventsTableUsingName(decodeURIComponent(command[3]));
+
+					// send success message back to client
+					res.end('success');
+
+				} else if(command[2] == 'delete') {
+					// handles deletion of records				
+					if(command[3] == 'top') {
+
+						database.remove(database.getRegistered()[0]);
+						res.end('success');
+
+					} else if(command[3] == 'bottom') {
+						// advertise command is not yet fully implemented
+						console.log('Unimplemented command called.');
+						return res.end('This command has not been implemented yet.');
+
+						// initialize record to delete with last item on database
+						var recordToDelete 			= database.getRegistered()[database.getRegistered().length - 1];
+						var numberOfDeletedRecords 	= 0;
+
+						// iterate through records from the bottom of the list until we find next one that hasn't been deleted
+						while(!recordToDelete.deleted) {
+							// increment tally of already deleted records
+							numberOfDeletedRecords++;
+
+							// assign next record from bottom as record to delete
+							recordToDelete = database.getRegistered()[database.getRegistered().length - 1 - numberOfDeletedRecords];
 						}
 
-						// advertise method of database export
-						console.log('database exported through command');
+						// tell database to remove the last record on the list
+						database.remove(database.getRegistered()[database.getRegistered().length - 1 - numberOfDeletedRecords], function(err) {
+							if(err) {
+								// advertise error
+								console.log('An error occurred deleting a database record -> ' + err);
 
-						// send success message back to client
-						res.end('success');
-					});
-
-					// generate a mysql table with all student information to easily add to spreadsheet
-					generateOutputMysqlTable();
-
-					// update mysql 'events' table with current entry counts
-					addToMysqlEventsTableUsingName(mysql.eventTableName);
-
-				} else if(command[1] == 'query') {
-					// send error back to client
-					res.end('I am not allowed to index the database yet.');
-				} else if(command[1] == 'create') {
-					res.end('ERR: Unimplemented command.');
-				} else if(command[1] == 'event') {
-					if(command[2] == 'name') {
-						database.global_values[0] = decodeURIComponent(command[3] + ' (' + global_date + ')');
-
-						// add event with its new name to the 'events' table in the mysql database
-						addToMysqlEventsTableUsingName(decodeURIComponent(command[3]));
-
-						// send success message back to client
-						res.end('success');
-					} else if(command[2] == 'delete') {
-						// handles deletion of records				
-						if(command[3] == 'top') {
-							database.remove(database.getRegistered()[0]);
-							res.end('success');
-						} else if(command[3] == 'bottom') {
-							// advertise command is not yet fully implemented
-							console.log('Unimplemented command called.');
-							return res.end('This command has not been implemented yet.');
-
-							// initialize record to delete with last item on database
-							var recordToDelete = database.getRegistered()[database.getRegistered().length - 1];
-							// initialize recordToDeleteCounter
-							var numberOfDeletedRecords = 0;
-
-							// iterate through records from the bottom of the list until we find next one that hasn't been deleted
-							while(!recordToDelete.deleted) {
-								// increment tally of already deleted records
-								numberOfDeletedRecords++;
-
-								// assign next record from bottom as record to delete
-								recordToDelete = database.getRegistered()[database.getRegistered().length - 1 - numberOfDeletedRecords];
+								// send back error response as JSON object to client and exit
+								return res.end(JSON.stringify({
+									error : err
+								}));
 							}
 
-							// tell database to remove the last record on the list
-							database.remove(database.getRegistered()[database.getRegistered().length - 1 - numberOfDeletedRecords], function(err) {
-								if(err) {
-									// advertise error
-									console.log('An error occurred deleting a database record -> ' + err);
+							console.log(database.getRegistered()[database.getRegistered().length-1].deleted);
 
-									// send back error response as JSON object to client and exit
-									return res.end(JSON.stringify({
-										error : err
-									}));
+							// if success, advertise
+							console.log('successfully deleted entry with id ' + database.getRegistered()[database.getRegistered().length-1].id);
+
+							// send back successful response as JSON object to client
+							return res.end(JSON.stringify({
+								data : {
+									error : false,
+									length : database.statistics.registeredCount,
+									stats : database.statistics
 								}
-
-								console.log(database.getRegistered()[database.getRegistered().length-1].deleted);
-
-								// if success, advertise
-								console.log('successfully deleted entry with id ' + database.getRegistered()[database.getRegistered().length-1].id);
-
-								// send back successful response as JSON object to client
-								return res.end(JSON.stringify({
-									data : {
-										error : false,
-										length : database.statistics.registeredCount,
-										stats : database.statistics
-									}
-								}));
-							});
-						} else {
-							res.end('ERR: Invalid event action.');
-						}
+							}));
+						});
 					} else {
 						res.end('ERR: Invalid event action.');
 					}
-				} else if(command[1] == 'request') {
-					// data for statistics is being requested
-					if(command[2] == 'stats') {
-						// call method pertaining to database
-						res.writeHead(200, {'Content-type':'application/json'});
-						res.end(JSON.stringify({
-							data : {
-								stats : database.statistics,
-								length : database.size('registered')
-							}
-						}));
-					}
 				} else {
-					res.end('ERR: Invalid command [' + command[1] + ']');
+					res.end('ERR: Invalid event action.');
 				}
-			});
-		} else {
-			console.log('ERR: Invalid request.');
-		}
+			} else if(command[1] == 'request') {
+				// data for statistics is being requested
+				if(command[2] == 'stats') {
+					// call method pertaining to database
+					res.writeHead(200, {'Content-type':'application/json'});
+					res.end(JSON.stringify({
+						data : {
+							stats : database.statistics,
+							length : database.size('registered')
+						}
+					}));
+				}
+			} else {
+				res.end('ERR: Invalid command [' + command[1] + ']');
+			}
+		});
+
 	} else {
 		fs.readFile(__dirname+path,function(err,data) {
 			if(err) {
@@ -1331,6 +1338,12 @@ function generateOutputMysqlTable() {
 	// assign the current date to the database (increase .getMonth() by one since months start at 0)
 	mysql.eventTableName = global_date = (date.getMonth() + 1) + '_' + date.getDate() + '_' + date.getFullYear();
 
+	// detect whether an argument was passed @ app begin
+	if(process.argv[2]) {
+		console.log('> Forcing table rename. Now using table \'' + process.argv[2] + '\' to store records.');
+		mysql.eventTableName = global_date = process.argv[2];
+	}
+
 	// before we try to populate internal database object, check to see if mysql server has any data in it
 	mysql.connect().query('SELECT id FROM students', function(err, rows, fields) {
 		// check for mysql query errors
@@ -1340,6 +1353,7 @@ function generateOutputMysqlTable() {
 
 			// populate database from spreadsheet and exit
 			return populateDatabaseFromSpreadsheet(function(err) {
+
 				if(err) {
 					// if fallback spreadsheet implementation errors, advertise error message and exit.
 					return console.log(	'[Fatal]: There was an error populating the database using spreadsheet' +
@@ -1348,6 +1362,7 @@ function generateOutputMysqlTable() {
 
 				// init autosave function using 'excel' method
 				autosave('excel');
+
 			});
 		}
 

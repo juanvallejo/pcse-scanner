@@ -1,4 +1,5 @@
 (function(window) {
+
 var App = {
 	doc:null,
 	events:{
@@ -118,11 +119,11 @@ window.addEventListener('load', function() {
 	// define main circle containing amount of current registrants
 	var statsOutProgress = new ProgressBar.Circle('#stats1', {
 		// circle loading bar properties
-		color:'#cbfca0',
+		color:'rgb(169,225,250)',
 		duration:1200,
 		easing:'easeIn',
-		strokeWidth:2,
-		trailColor:'rgba(203,252,160,0.09)'
+		strokeWidth:1,
+		trailColor:'rgba(169,225,250,0.1)'
 
 	});
 
@@ -174,18 +175,25 @@ window.addEventListener('load', function() {
 	 * @param callback = 	{Function} 	to call once response from Node.js server is received
 	 */
 	sid.command = function(command, callback) {
+
 		var xhr = new XMLHttpRequest();
 		xhr.open('POST','/command',true);
 		xhr.send(command);
+
 		xhr.addEventListener('readystatechange',function() {
+
 			if(this.readyState == 4 && this.status == 200) {
+
 				if(this.responseText == 'success') {
 					callback.call(this);	
 				} else {
 					callback.call(this, this.responseText);
 				}
+
 			}
+
 		});
+
 	};
 
 	/**

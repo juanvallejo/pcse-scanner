@@ -12,29 +12,40 @@
 }
 
 
+::-webkit-input-placeholder {
+color:rgb(255,255,255);
+}
+
 html,body {
+
 	height:100%;
 	width:100%;
+	overflow:hidden;
+
 }
 
 body {
-	background:white url(bg.png) no-repeat 0 0 fixed;
+
+	background:black url(bg.jpg) no-repeat 0 0 fixed;
+	/*background:rgb(4,13,20);*/
 	background-size:cover;
 	color:rgb(85,85,85);
 	float:left;
 	font:400 16px 'Helvetica Neue','Gabriela',arial,sans-serif;
-	overflow:hidden;
+
 }
 
 
 #overlay {
-	background:rgba(0,0,0,0.5);
+
+	background:rgba(0,0,0,0.9);
 	display:none;
 	height:100%;
 	left:0;
 	position:fixed;
 	top:0;
 	width:100%; 
+
 }
 
 #main-panel {
@@ -45,7 +56,18 @@ body {
 }
 
 	#main-panel .fx-shadow-overlay {
-	width:100%; height:100%; position:absolute; top:0; left:0; min-height:100px; box-shadow:inset 1px 10px 100px rgba(0,0,0,0.7);
+
+		width:100%; 
+		height:100%; 
+		min-height:100px;
+
+		position:absolute; 
+		top:0; 
+		left:0;  
+
+		/*box-shadow:inset 1px 1px 100px rgba(0,0,0,0.7);*/
+
+		background:rgba(0,0,0,0.63);
 	}
 
 	#stats1 {
@@ -107,13 +129,13 @@ body {
 				}
 		
 		#out {
-			color:rgba(255,255,255,0.8);
+			color:/*rgb(169,225,250)*/rgba(255,255,255,1);
 			font:100 2.5em 'Helvetica Neue';
 			font-size:1.2em; text-align:center; width:100%; margin-top:-1%;
 			letter-spacing:1px;
 			margin:30% 0 0 0 ;
 			opacity:0.6;
-			text-shadow:0 1px 0 rgba(0,12,22,0.5);
+			text-shadow:0 1px 0 rgba(0,0,0,0.9);
 		}
 
 #footer {
@@ -133,7 +155,7 @@ font:200 0.8em 'Helvetica Neue'; color:rgba(255,255,255,0.4); text-shadow:0 1px 
 }
 
 	.stats .stats-out {
-		color:rgba(255,255,255,0.45);
+		color:rgba(169,225,250,0.9);
 		font:100 3.8em 'Helvetica Neue';
 		height:230px;
 		position:relative;
@@ -178,7 +200,7 @@ width:100%; float:left; min-height:50px; background:rgba(0,0,0,0.6); border-bott
 						.panel-content .editor .editor-wrapper .editor-content #sid-input {
 							background:transparent;
 							border:0;
-							color:rgba(255,255,255,0.75);
+							color:rgba(255,255,255,1);
 							font:100 3em 'Helvetica Neue';
 							left:50%;
 							margin:-40px 0 0 -300px;

@@ -67,7 +67,7 @@ body {
 
 		/*box-shadow:inset 1px 1px 100px rgba(0,0,0,0.7);*/
 
-		background:rgba(0,0,0,0.63);
+		background:rgba(4,13,20,0.6);
 	}
 
 	#stats1 {
@@ -133,9 +133,10 @@ body {
 			font:100 2.5em 'Helvetica Neue';
 			font-size:1.2em; text-align:center; width:100%; margin-top:-1%;
 			letter-spacing:1px;
-			margin:30% 0 0 0 ;
-			opacity:0.6;
-			text-shadow:0 1px 0 rgba(0,0,0,0.9);
+			margin:54% 0 0 0 ;
+			opacity:0.5;
+			/*background:red;*/
+			/*text-shadow:0 1px 0 rgba(0,0,0,0.9);*/
 		}
 
 #footer {
@@ -155,7 +156,7 @@ font:200 0.8em 'Helvetica Neue'; color:rgba(255,255,255,0.4); text-shadow:0 1px 
 }
 
 	.stats .stats-out {
-		color:rgba(169,225,250,0.9);
+		color:rgba(255,255,255,0.5);
 		font:100 3.8em 'Helvetica Neue';
 		height:230px;
 		position:relative;

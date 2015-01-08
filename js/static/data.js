@@ -123,7 +123,7 @@ window.addEventListener('load', function() {
 		duration:1200,
 		easing:'easeIn',
 		strokeWidth:1,
-		trailColor:'rgba(169,225,250,0.1)'
+		trailColor:'rgba(255,255,255,0.1)'
 
 	});
 

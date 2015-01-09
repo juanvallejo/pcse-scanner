@@ -19,6 +19,8 @@
 * 		- excel -> npm install excel
 * 		- mysql	-> npm install mysql
 * 		- xlsx 	-> npm install xlsx-writer
+*
+* BUG: two extra zeroes are added before every new student ID
 */
 
 // define server constants

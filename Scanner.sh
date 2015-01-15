@@ -12,14 +12,9 @@ UNAME_OUT=`uname`;
 PATH_TO_EXEC="js/scanner.js";
 APP_UI_ADDRESS="http://localhost:8000";
 
-
    PLATFORM='linux';
-   ROOT_PATH='/home/pcse/Documents/pcse-scanner';
+   ROOT_PATH='/home/pcse/Documents/pcse-scanner/';
    google-chrome $APP_UI_ADDRESS;
-
-
-
-echo $ROOT_PATH$PATH_TO_EXEC;
 
 wait;
 node $ROOT_PATH$PATH_TO_EXEC;

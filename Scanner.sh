@@ -26,6 +26,7 @@ elif [[ "$UNAME_OUT" == 'Darwin' ]]; then
 
 fi
 
+echo $UNAME_OUT;
 echo $ROOT_PATH$PATH_TO_EXEC;
 
 wait;

@@ -558,6 +558,7 @@ window.addEventListener('load', function() {
 						xhr.open('POST', uri, true);
 						xhr.send(data);
 						xhr.addEventListener('readystatechange',function() {
+							
 							if(this.readyState == 4 && this.status == 200) {
 								var student = JSON.parse(this.responseText);
 								

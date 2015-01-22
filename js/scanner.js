@@ -106,7 +106,7 @@ function parseBarcode(code) {
 	});
 
 	if(search.length) {
-		console.log('Welcome back, '+search[0].fname+' '+search[0].lname+'!');
+		console.log('Welcome back, ' + search[0].fname + ' '+search[0].lname+'!');
 	} else {
 		console.log('You must be new here... ('+ code +')');
 	}
@@ -640,6 +640,7 @@ http.createServer(function(req, res) {
 				};
 
 				if(name.length == 0) {
+
 					var name2 = database.find({
 						id:'00'+id
 					});
@@ -647,6 +648,7 @@ http.createServer(function(req, res) {
 					if(name2.length > 0) {
 						name = name2;
 					}
+					
 				}
 
 				if(name.length > 0) {
@@ -699,7 +701,7 @@ http.createServer(function(req, res) {
 				});
 
 				// format the entry id to include two 0's in front of number to match database format
-				entry.student_id = '00' + entry.student_id;
+				entry.student_id = entry.student_id;
 
 				// #todo change format of name in client side
 				console.log('Registering \'' + entry.first + ' ' + entry.last + '\' with ID ' + entry.student_id);

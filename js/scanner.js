@@ -767,8 +767,12 @@ http.createServer(function(req, res) {
 				addToMysqlEventsTableUsingName(mysql.eventTableName);
 
 			} else if(command[1] == 'query') {
+
+				// database.query();
+
 				// send error back to client
 				res.end('I am not allowed to index the database yet.');
+				
 			} else if(command[1] == 'create') {
 				res.end('ERR: Unimplemented command.');
 			} else if(command[1] == 'event') {
@@ -870,7 +874,7 @@ http.createServer(function(req, res) {
 			res.end(data);
 		});
 	}
-}).listen(SERVER_PORT);
+}).listen(SERVER_PORT, '0.0.0.0');
 
 /**
  * Takes the event's official name assigned by the user through the client, and 

@@ -42,7 +42,7 @@ var MYSQL_DEFAULT_USER	= 'root';							// define username for mysql server
 var fs 		= require('fs');
 var http 	= require('http');
 var excel 	= require('excel');
-var xlsx 	= require('xlsx-writer');
+//var xlsx 	= require('xlsx-writer');
 var csv 	= require('fast-csv');
 
 /**
@@ -77,7 +77,7 @@ stdin.on('data',function(key) {
 			var command = value.split('/');
 			if(command[1] == 'export') {
 				if(command[2] == 'excel') {
-					exportDatabase();
+					//exportDatabase();
 				} else if(command[2] == 'csv') {
 					console.log('Please use the graphical interface to interact with this command.');
 				}
@@ -744,27 +744,49 @@ http.createServer(function(req, res) {
 															// [3] -> data to use when applying action to target
 
 			if(command[1] == 'export') {
-				// override second command if mysql server is currently being used for data
-				// by exporting database we are simply updating new entries and registered students
-				exportDatabase((mysql.isConnected ? 'mysql' : command[2]), function(err) {
-					// check for errors
-					if(err) {
-						// send error message back to client and exit
-						return res.end('ERR: There was an error exporting the data: '+err);
-					}
 
-					// advertise method of database export
-					console.log('database exported through command');
+				// activate spreadsheet export
+				if(command[2] && command[2] == 'excel') {
 
-					// send success message back to client
-					res.end('success');
-				});
+					exportDatabase('excel', function(err) {
+						// check for errors
+						if(err) {
+							// send error message back to client and exit
+							return res.end('ERR: There was an error exporting the data: '+err);
+						}
 
-				// generate a mysql table with all student information to easily add to spreadsheet
-				generateOutputMysqlTable();
+						// advertise method of database export
+						console.log('database exported through excel command');
 
-				// update mysql 'events' table with current entry counts
-				addToMysqlEventsTableUsingName(mysql.eventTableName);
+						// send success message back to client
+						res.end('success');
+					});
+
+
+				} else {
+
+					// override second command if mysql server is currently being used for data
+					// by exporting database we are simply updating new entries and registered students
+					exportDatabase((mysql.isConnected ? 'mysql' : command[2]), function(err) {
+						// check for errors
+						if(err) {
+							// send error message back to client and exit
+							return res.end('ERR: There was an error exporting the data: '+err);
+						}
+
+						// advertise method of database export
+						console.log('database exported through mysql command');
+
+						// send success message back to client
+						res.end('success');
+					});
+
+					// generate a mysql table with all student information to easily add to spreadsheet
+					generateOutputMysqlTable();
+
+					// update mysql 'events' table with current entry counts
+					addToMysqlEventsTableUsingName(mysql.eventTableName);
+				}
 
 			} else if(command[1] == 'query') {
 
@@ -1060,6 +1082,7 @@ function exportDatabase(type, fname, callback) {
 	}
 
 	if(type == 'excel' || !type) {
+
 		if(fs.existsSync(fname)) {
 			fs.unlink(fname,function(err) {
 				if(err) {
@@ -1092,21 +1115,22 @@ function exportDatabase(type, fname, callback) {
 		});
 
 		// write all objects in data array to created spreadsheet
-		return xlsx.write(fname, data, function(err) {
-			if(err) {
-				// log error
-				console.log(err);
-
-				// call callback function with error
-				return callback.call(this, err);
-			}
-
-			console.log('The excel document has been updated!');
-
-			if(callback && typeof callback == 'function') {
-				callback.call(this);
-			}
-		});
+		return "";
+        //return xlsx.write(fname, data, function(err) {
+		//	if(err) {
+		//		// log error
+		//		console.log(err);
+//
+//				// call callback function with error
+//				return callback.call(this, err);
+//			}
+//
+//			console.log('The excel document has been updated!');
+//
+//			if(callback && typeof callback == 'function') {
+//				callback.call(this);
+//			}
+//		});
 
 	} else if(type == 'csv') {
 		if(fs.existsSync('data.csv')) {

@@ -300,7 +300,7 @@ window.addEventListener('load', function() {
 								sid.write('A CSV file has been created from the data.');
 							});
 						}
-					} else if(sid.value.match(/(\ )+(db|mysql|sql|database)/gi)) {
+					} else if(sid.value.match(/(\ )+(db|mysql|sql|database)/gi) || !sid.value.match(/(\ )+(excel)/gi)) {
 						sid.command('/export/mysql',function(err) {
 							if(err) {
 								return sid.write('There was an error updating the Excel spreadsheet.');

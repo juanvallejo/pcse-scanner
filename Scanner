@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# define path to program, assuming this file is
+# inside of the application's folder
+
+PLATFORM=`uname`;
+PATH_TO_EXEC="js/scanner.js";
+APP_UI_ADDRESS="http://localhost:8000";
+
+cd `dirname $0`
+
+if [[ -d './js' ]]
+then
+	cd './js';
+fi
+
+if [[ $PLATFORM == 'Darwin' ]]
+then
+	ROOT_PATH='/Users/juanvallejo/Documents/pcse-scanner/';
+	sh -c "bash -c \"open -a 'Google Chrome' 'http://localhost:8000'\"";
+	sh -c "bash -c \"node $ROOT_PATH$PATH_TO_EXEC\""
+else
+	ROOT_PATH='/home/pcse/Documents/pcse-scanner/';
+	gnome-terminal -e "bash -c \"google-chrome http://localhost:8000\"";
+	gnome-terminal -e "bash -c \"node $ROOT_PATH$PATH_TO_EXEC\"";
+fi

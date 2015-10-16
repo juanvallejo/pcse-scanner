@@ -247,8 +247,17 @@ window.addEventListener('load', function() {
 
 	// event fires after a response from server is received with statistical data
 	events.on('serverStatsReceived', function(data) {
+
+		var percentage;
+
+		if(data.stats.average) {
+			percentage = (data.length / data.stats.average);
+		} else {
+			percentage = data.length / 100;
+		}
+
 		// animate and increase registrant counter
-		statsOutProgress.animate((data.length / data.stats.average), {
+		statsOutProgress.animate(percentage, {
 
 			duration: 800
 		
@@ -259,7 +268,7 @@ window.addEventListener('load', function() {
 
 			// log data received from server
 			stats.total = data.length; 
-			stats.average = data.stats.average;
+			stats.average = (data.stats.average || 100);
 			stats.averageNew = data.stats.averageNew;
 		});
 	});

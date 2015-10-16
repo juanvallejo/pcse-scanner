@@ -20,7 +20,7 @@
 * 		- mysql	-> npm install mysql
 * 		- xlsx 	-> npm install xlsx-writer
 *
-* BUG: two extra zeroes are added before every new student ID
+* BUG: two extra zeroes are omitted before every new student ID
 */
 
 // define server constants
@@ -42,7 +42,7 @@ var MYSQL_DEFAULT_USER	= 'root';							// define username for mysql server
 var fs 		= require('fs');
 var http 	= require('http');
 var excel 	= require('excel');
-//var xlsx 	= require('xlsx-writer');
+var xlsx 	= require('xlsx-writer');
 var csv 	= require('fast-csv');
 
 /**
@@ -77,7 +77,8 @@ stdin.on('data',function(key) {
 			var command = value.split('/');
 			if(command[1] == 'export') {
 				if(command[2] == 'excel') {
-					//exportDatabase();
+					// exportDatabase();
+					console.log('Please use the graphical interface to interact with this command.');
 				} else if(command[2] == 'csv') {
 					console.log('Please use the graphical interface to interact with this command.');
 				}
@@ -353,11 +354,16 @@ var database = {
 				year:entry[3],
 				major:entry[4],
 				email:entry[5],
-				visits:entry[6] == ' ' ? 0 : parseInt(entry[6]),
+				registered:entry[6] == ' ' ? 0 : parseInt(entry[6]),
 				events:(!entry[7]) ? '' : entry[7],
-				registered:false,
-				deleted:false
+				deleted:false,
+				visits: 0
 			});
+
+			// increment stats
+			if(entry[6] != ' ') {
+				database.statistics.registeredCount++;
+			}
 
 		} else {
 			// assume mysql data (in form of JSON objects) otherwise
@@ -1026,17 +1032,23 @@ function populateDatabaseFromMysql(callback) {
  * @param callback = {Function} to be called when excel sheet is done being read.
 **/
 function populateDatabaseFromSpreadsheet(callback) {
+
+	var local_outputfile_exists = false;
+	if(fs.existsSync(global_date + '_' + EXCEL_OUTPUT_FILE)) {
+		local_outputfile_exists = true;
+	}
+
 	// checks if file exists
-	if(!fs.existsSync(EXCEL_OUTPUT_FILE)) {
+	if(!fs.existsSync(EXCEL_OUTPUT_FILE) && !local_outputfile_exists) {
 		// define error message for no spreadsheet document found and exit
 		var err = 'There is no database document present. Unable to proceed.';
 
 		// call callback function and pass error message
 		return callback.call(this, err);
 	}
-	
+
 	// use excel package to read spreadsheet file
-	excel(EXCEL_OUTPUT_FILE, function(err, data) {
+	excel((local_outputfile_exists ? global_date + '_' + EXCEL_OUTPUT_FILE : EXCEL_OUTPUT_FILE), function(err, data) {
 		if(err) {
 			// exit function and log error message to database.
 			return console.log('Error reading spreadsheet file. -> '+err);
@@ -1066,7 +1078,11 @@ function populateDatabaseFromSpreadsheet(callback) {
 		database.setRawData(data);
 
 		// Log to database that database has been populated and app is ready.
-		console.log('local database has been populated from spreadsheet.');
+		if(local_outputfile_exists) {
+			console.log('The local database has been populated from an existing spreadsheet (' + (global_date + '_' + EXCEL_OUTPUT_FILE) + ').');
+		} else {
+			console.log('The local database has been populated from spreadsheet.');
+		}
 	});
 };
 
@@ -1080,6 +1096,9 @@ function exportDatabase(type, fname, callback) {
 		// define output file from global setting if none is given
 		fname = EXCEL_OUTPUT_FILE;
 	}
+
+	// save to individual file for current day - prevents destructive output
+	fname = global_date + '_' + EXCEL_OUTPUT_FILE;
 
 	if(type == 'excel' || !type) {
 
@@ -1101,36 +1120,35 @@ function exportDatabase(type, fname, callback) {
 			if(!entry.deleted) {
 
 				data.push({
-					'ID'			: 	entry.id,				// contains student id as a string
-					'LAST'			: 	entry.lname,			// contains student's last name
-					'FIRST'			: 	entry.fname,			// contains student's first name
-					'STUCLASS_DESC' : 	entry.year,				// contains student's class (freshman .. senior)
-					'MAJR1'			: 	entry.major,			// contains student's area of study
-					'EMAIL'			: 	entry.email,			// contains student's school email
-					'VISITS'		: 	(''+entry.visits+''),	// add quotes to make sure value is treated as String, not Integer
-					'EVENTS'		: 	entry.events 			// string containing event name (followed by current date and a comma)
+					'ID'			: 	entry.id,						// contains student id as a string
+					'LAST'			: 	entry.lname,					// contains student's last name
+					'FIRST'			: 	entry.fname,					// contains student's first name
+					'YEAR' 			: 	entry.year,						// contains student's class (freshman .. senior)
+					'MAJOR'			: 	entry.major,					// contains student's area of study
+					'EMAIL'			: 	entry.email,					// contains student's school email
+					'AT_EVENT'		: 	(entry.registered ? '1' : ' '),	// add quotes to make sure value is treated as String, not Integer
+					'DATE'			: 	(entry.registered ? global_date : null) 					// string containing event name (followed by current date and a comma)
 				});
 
 			}
 		});
 
 		// write all objects in data array to created spreadsheet
-		return "";
-        //return xlsx.write(fname, data, function(err) {
-		//	if(err) {
-		//		// log error
-		//		console.log(err);
-//
-//				// call callback function with error
-//				return callback.call(this, err);
-//			}
-//
-//			console.log('The excel document has been updated!');
-//
-//			if(callback && typeof callback == 'function') {
-//				callback.call(this);
-//			}
-//		});
+        return xlsx.write(fname, data, function(err) {
+			if(err) {
+				// log error
+				console.log(err);
+
+				// call callback function with error
+				return callback.call(this, err);
+			}
+
+			console.log('The excel document (' + fname + ') has been updated!');
+
+			if(callback && typeof callback == 'function') {
+				callback.call(this);
+			}
+		});
 
 	} else if(type == 'csv') {
 		if(fs.existsSync('data.csv')) {

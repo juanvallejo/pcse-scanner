@@ -1,0 +1,27 @@
+{
+  "name": "pcse-scanner",
+  "version": "1.0.0",
+  "description": "pcse-scanner ============",
+  "main": "js/scanner.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/juanvallejo/pcse-scanner.git"
+  },
+  "author": "juanvallejo",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/juanvallejo/pcse-scanner/issues"
+  },
+  "homepage": "https://github.com/juanvallejo/pcse-scanner",
+  "dependencies": {
+    "appjs": "0.0.20",
+    "appjs-darwin": "0.0.19",
+    "excel": "^0.1.4",
+    "fast-csv": "^0.6.0",
+    "mysql": "^2.9.0",
+    "xlsx-writer": "0.0.10"
+  }
+}

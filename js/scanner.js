@@ -5,13 +5,14 @@
 * @file scanner.js
 *
 * @author juanvallejo
-* @date 10/15/14
+* @date 10/20/15
 *
 * Scanner application 'server'. Handles all data processing and i/o.
 * Reads data from a local mysql database, builds an internal structure
 * with it, and allows for easy manipulation of it. Outputs to .xlsx file.
 *
 * Note: @callback_params are parameters passed to a callback function
+* CNU Business Department Version
 *
 * Important: Requires the following dependencies / node.js packages:
 *
@@ -27,8 +28,10 @@
 var SERVER_PORT 		= 8000;								// port at which to have server listen for connections
 
 // define excel output and input filenames
-var EXCEL_OUTPUT_FILE 	= 'db.xlsx';						// define name of output spreadsheet file (will be replaced) if it exists
+var EXCEL_OUTPUT_FILE 	= 'Master.xlsx';					// define name of output spreadsheet file (will be replaced) if it exists
 var EXCEL_AUTOSAVE_FILE	= 'db_autosave.xlsx';				// defines filename used to export autosaved backups of database entries
+
+var EXCEL_RESULTS_DIR 	= '../results/';
 
 // define default mysql constants
 var MYSQL_DEFAULT_HOST 	= 'localhost';						// define address of mysql server
@@ -353,15 +356,16 @@ var database = {
 				lname:entry[1],
 				year:entry[3],
 				major:entry[4],
-				email:entry[5],
-				registered:entry[6] == ' ' ? 0 : parseInt(entry[6]),
-				events:(!entry[7]) ? '' : entry[7],
+				minor:entry[5],
+				email:entry[6],
+				registered:((!entry[7] || entry[7] == undefined || entry[7] == ' ') ? 0 : parseInt(entry[7])),
+				events:(!entry[8]) ? '' : entry[8],
 				deleted:false,
 				visits: 0
 			});
 
 			// increment stats
-			if(entry[6] != ' ') {
+			if(entry[7] && parseInt(entry[7]) == 1) {
 				database.statistics.registeredCount++;
 			}
 
@@ -752,7 +756,7 @@ http.createServer(function(req, res) {
 			if(command[1] == 'export') {
 
 				// activate spreadsheet export
-				if(command[2] && command[2] == 'excel') {
+				if(!command[2] || command[2] == 'excel') {
 
 					exportDatabase('excel', function(err) {
 						// check for errors
@@ -1033,13 +1037,14 @@ function populateDatabaseFromMysql(callback) {
 **/
 function populateDatabaseFromSpreadsheet(callback) {
 
+	// check for individual event data
 	var local_outputfile_exists = false;
-	if(fs.existsSync(global_date + '_' + EXCEL_OUTPUT_FILE)) {
+	if(fs.existsSync(EXCEL_RESULTS_DIR + global_date + '_' + EXCEL_OUTPUT_FILE)) {
 		local_outputfile_exists = true;
 	}
 
 	// checks if file exists
-	if(!fs.existsSync(EXCEL_OUTPUT_FILE) && !local_outputfile_exists) {
+	if(!fs.existsSync(EXCEL_RESULTS_DIR + EXCEL_OUTPUT_FILE) && !local_outputfile_exists) {
 		// define error message for no spreadsheet document found and exit
 		var err = 'There is no database document present. Unable to proceed.';
 
@@ -1048,7 +1053,7 @@ function populateDatabaseFromSpreadsheet(callback) {
 	}
 
 	// use excel package to read spreadsheet file
-	excel((local_outputfile_exists ? global_date + '_' + EXCEL_OUTPUT_FILE : EXCEL_OUTPUT_FILE), function(err, data) {
+	excel((local_outputfile_exists ? EXCEL_RESULTS_DIR + global_date + '_' + EXCEL_OUTPUT_FILE : (EXCEL_RESULTS_DIR + EXCEL_OUTPUT_FILE)), function(err, data) {
 		if(err) {
 			// exit function and log error message to database.
 			return console.log('Error reading spreadsheet file. -> '+err);
@@ -1098,7 +1103,7 @@ function exportDatabase(type, fname, callback) {
 	}
 
 	// save to individual file for current day - prevents destructive output
-	fname = global_date + '_' + EXCEL_OUTPUT_FILE;
+	fname = EXCEL_RESULTS_DIR + global_date + '_' + EXCEL_OUTPUT_FILE;
 
 	if(type == 'excel' || !type) {
 
@@ -1120,14 +1125,15 @@ function exportDatabase(type, fname, callback) {
 			if(!entry.deleted) {
 
 				data.push({
-					'ID'			: 	entry.id,						// contains student id as a string
-					'LAST'			: 	entry.lname,					// contains student's last name
-					'FIRST'			: 	entry.fname,					// contains student's first name
-					'YEAR' 			: 	entry.year,						// contains student's class (freshman .. senior)
-					'MAJOR'			: 	entry.major,					// contains student's area of study
-					'EMAIL'			: 	entry.email,					// contains student's school email
-					'AT_EVENT'		: 	(entry.registered ? '1' : ' '),	// add quotes to make sure value is treated as String, not Integer
-					'DATE'			: 	(entry.registered ? global_date : null) 					// string containing event name (followed by current date and a comma)
+					'ID'			: 	entry.id,								// contains student id as a string
+					'LAST'			: 	entry.lname,							// contains student's last name
+					'FIRST'			: 	entry.fname,							// contains student's first name
+					'YEAR' 			: 	entry.year,								// contains student's class (freshman .. senior)
+					'MAJOR'			: 	entry.major,							// contains student's area of study
+					'MINOR'			: 	(entry.minor ? entry.minor : ' '),		// contains student's area of study
+					'EMAIL'			: 	entry.email,							// contains student's school email
+					'AT_EVENT'		: 	(entry.registered ? '1' : ' '),			// add quotes to make sure value is treated as String, not Integer
+					'DATE'			: 	(entry.registered ? global_date : null) // string containing event name (followed by current date and a comma)
 				});
 
 			}
@@ -1582,7 +1588,7 @@ function generateOutputMysqlTable() {
 			}
 
 			// advertise that the database has been auto-saved
-			console.log('The database has been auto-saved.');
+			console.log('The database has been auto-saved using method \'' + method + '\'.');
 
 			// set timeout of 60 seconds
 			setTimeout(function() {

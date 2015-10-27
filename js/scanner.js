@@ -27,8 +27,10 @@
 var SERVER_PORT 		= 8000;								// port at which to have server listen for connections
 
 // define excel output and input filenames
-var EXCEL_OUTPUT_FILE 	= 'db.xlsx';						// define name of output spreadsheet file (will be replaced) if it exists
+var EXCEL_OUTPUT_FILE 	= 'Master.xlsx';						// define name of output spreadsheet file (will be replaced) if it exists
 var EXCEL_AUTOSAVE_FILE	= 'db_autosave.xlsx';				// defines filename used to export autosaved backups of database entries
+
+var EXCEL_RESULTS_DIR = '../results/';
 
 // define default mysql constants
 var MYSQL_DEFAULT_HOST 	= 'localhost';						// define address of mysql server
@@ -354,14 +356,14 @@ var database = {
 				year:entry[3],
 				major:entry[4],
 				email:entry[5],
-				registered:entry[6] == ' ' ? 0 : parseInt(entry[6]),
+				registered:((!entry[6] || entry[6] == undefined || entry[6] == ' ') ? 0 : parseInt(entry[6])),
 				events:(!entry[7]) ? '' : entry[7],
 				deleted:false,
 				visits: 0
 			});
 
 			// increment stats
-			if(entry[6] != ' ') {
+			if(entry[6] && parseInt(entry[6]) == 1) {
 				database.statistics.registeredCount++;
 			}
 
@@ -1033,13 +1035,14 @@ function populateDatabaseFromMysql(callback) {
 **/
 function populateDatabaseFromSpreadsheet(callback) {
 
+	// check for individual event data
 	var local_outputfile_exists = false;
-	if(fs.existsSync(global_date + '_' + EXCEL_OUTPUT_FILE)) {
+	if(fs.existsSync(EXCEL_RESULTS_DIR + global_date + '_' + EXCEL_OUTPUT_FILE)) {
 		local_outputfile_exists = true;
 	}
 
 	// checks if file exists
-	if(!fs.existsSync(EXCEL_OUTPUT_FILE) && !local_outputfile_exists) {
+	if(!fs.existsSync(EXCEL_RESULTS_DIR + EXCEL_OUTPUT_FILE) && !local_outputfile_exists) {
 		// define error message for no spreadsheet document found and exit
 		var err = 'There is no database document present. Unable to proceed.';
 
@@ -1048,7 +1051,7 @@ function populateDatabaseFromSpreadsheet(callback) {
 	}
 
 	// use excel package to read spreadsheet file
-	excel((local_outputfile_exists ? global_date + '_' + EXCEL_OUTPUT_FILE : EXCEL_OUTPUT_FILE), function(err, data) {
+	excel((local_outputfile_exists ? EXCEL_RESULTS_DIR + global_date + '_' + EXCEL_OUTPUT_FILE : (EXCEL_RESULTS_DIR + EXCEL_OUTPUT_FILE)), function(err, data) {
 		if(err) {
 			// exit function and log error message to database.
 			return console.log('Error reading spreadsheet file. -> '+err);
@@ -1098,7 +1101,7 @@ function exportDatabase(type, fname, callback) {
 	}
 
 	// save to individual file for current day - prevents destructive output
-	fname = global_date + '_' + EXCEL_OUTPUT_FILE;
+	fname = EXCEL_RESULTS_DIR + global_date + '_' + EXCEL_OUTPUT_FILE;
 
 	if(type == 'excel' || !type) {
 
@@ -1583,6 +1586,7 @@ function generateOutputMysqlTable() {
 
 			// advertise that the database has been auto-saved
 			console.log('The database has been auto-saved.');
+			console.log('The database has been auto-saved using method \'' + method + '\'.');
 
 			// set timeout of 60 seconds
 			setTimeout(function() {

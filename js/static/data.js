@@ -594,15 +594,15 @@ window.addEventListener('load', function() {
 									sid.value 		= '';						// reset our input value
 									sid.placeholder = 							// sets input with instructions for user
 									
-										'Enter your name to continue...';
+										'NEW STUDENT... Use Sheet';
 
-									sid.state 		= 3;						// state of '3' tells input field to reset its value
-									sid.dataState 	= 1;
-									sid.reg 		= true;						// tell app it is now in 'registration' mode
-									sid.sid 		= student.id; 				// store student id in our main input field object
+									sid.state 		= 1;						// state of '3' tells input field to reset its value
+									sid.dataState 	= null;
+									sid.reg 		= false;						// tell app it is now in 'registration' mode
+									sid.sid 		= null; 				// store student id in our main input field object
 
 									// output registration message to the interface console
-									sid.write('Welcome. Follow the steps above to register.');
+									sid.write('Welcome. Please use the sigin sheet to sign up.');
 								}
 							}
 						});

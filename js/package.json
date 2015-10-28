@@ -20,6 +20,7 @@
     "excel": "^0.1.4",
     "fast-csv": "^0.6.0",
     "mysql": "^2.9.0",
+    "node-xlsx": "^0.6.0",
     "xlsx-writer": "0.0.10"
   }
 }

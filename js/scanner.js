@@ -44,7 +44,7 @@ var MYSQL_DEFAULT_USER	= 'root';							// define username for mysql server
 **/
 var fs 		= require('fs');
 var http 	= require('http');
-var excel 	= require('excel');
+var excel 	= require('node-xlsx');
 var xlsx 	= require('xlsx-writer');
 var csv 	= require('fast-csv');
 
@@ -1053,11 +1053,10 @@ function populateDatabaseFromSpreadsheet(callback) {
 	}
 
 	// use excel package to read spreadsheet file
-	excel((local_outputfile_exists ? EXCEL_RESULTS_DIR + global_date + '_' + EXCEL_OUTPUT_FILE : (EXCEL_RESULTS_DIR + EXCEL_OUTPUT_FILE)), function(err, data) {
-		if(err) {
-			// exit function and log error message to database.
-			return console.log('Error reading spreadsheet file. -> '+err);
-		}
+	try {
+
+		var excelData = excel.parse(__dirname + '/' + (local_outputfile_exists ? EXCEL_RESULTS_DIR + global_date + '_' + EXCEL_OUTPUT_FILE : (EXCEL_RESULTS_DIR + EXCEL_OUTPUT_FILE)));
+		var data = excelData[0].data;
 
 		// loop through and add all rows (as arrays) from file to database
 		for(var i = 1; i < data.length; i++) {
@@ -1088,7 +1087,11 @@ function populateDatabaseFromSpreadsheet(callback) {
 		} else {
 			console.log('The local database has been populated from spreadsheet.');
 		}
-	});
+
+	} catch(err) {
+		console.log('Error reading spreadsheet file. -> ' + err);
+	}
+
 };
 
 function exportDatabase(type, fname, callback) {

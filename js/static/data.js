@@ -5,6 +5,7 @@ var App = {
 	events:{
 		resize:[]
 	},
+	audio: null,
 	properties:{
 		minDocumentHeight:500
 	},
@@ -33,6 +34,23 @@ var App = {
 		editorPanel.style.height = (window.innerHeight * 0.11)+"px";
 
 		this.addResizeListener(mainPanel, 'height', 0.60, true);
+	},
+
+	playAlert: function() {
+		if(!App.audio) {
+			App.audio = new Audio();
+			App.audio.src = 'resources/alert.mp3';
+		}
+
+		if(App.audio.isPlaying) {
+			App.audio.isPlaying = false;
+			App.audio.pause();
+			App.audio.currentTime = 0;
+		}
+
+		App.audio.isPlaying = true;
+		App.audio.play();
+
 	},
 
 	init:function() {
@@ -309,7 +327,7 @@ window.addEventListener('load', function() {
 								sid.write('A CSV file has been created from the data.');
 							});
 						}
-					} else if(sid.value.match(/(\ )+(db|mysql|sql|database)/gi) || !sid.value.match(/(\ )+(excel)/gi)) {
+					} else if(sid.value.match(/(\ )+(db|mysql|sql|database)/gi) && !sid.value.match(/(\ )+(excel)/gi)) {
 						sid.command('/export/mysql',function(err) {
 							if(err) {
 								return sid.write('There was an error updating the Excel spreadsheet.');
@@ -603,6 +621,9 @@ window.addEventListener('load', function() {
 
 									// output registration message to the interface console
 									sid.write('Welcome. Follow the steps above to register.');
+
+									// play sound alert
+									App.playAlert();
 								}
 							}
 						});

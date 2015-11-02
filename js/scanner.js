@@ -23,11 +23,13 @@
 * BUG: two extra zeroes are omitted before every new student ID
 */
 
+var DEBUG 				= true; 							// turns debug mode on or off for local development
+
 // define server constants
 var SERVER_PORT 		= 8000;								// port at which to have server listen for connections
 
 // define excel output and input filenames
-var EXCEL_OUTPUT_FILE 	= 'Master.xlsx';						// define name of output spreadsheet file (will be replaced) if it exists
+var EXCEL_OUTPUT_FILE 	= 'Master.xlsx';					// define name of output spreadsheet file (will be replaced) if it exists
 var EXCEL_AUTOSAVE_FILE	= 'db_autosave.xlsx';				// defines filename used to export autosaved backups of database entries
 
 var EXCEL_RESULTS_DIR = '../results/';
@@ -38,6 +40,12 @@ var MYSQL_DEFAULT_PASS	= '';								// define password for mysql server
 var MYSQL_DEFAULT_DB 	= 'pizza_my_mind';					// define default mysql database name
 var MYSQL_DEFAULT_USER	= 'root';							// define username for mysql server
 
+var API_SERVER_URL 		= (DEBUG ? 'http://localhost:7777' : 
+			'https://pmm-rubyserverapps.rhcloud.com:8443'); // used to host remote data for access with API
+var API_SERVER_TIMEOUT 	= 3; 								// if unable to connect to the remote API server,
+															// client will attempt to reconnect n more times before giving up
+var API_SERVER_R_FREQ 	= 5000; 							// time in milliseconds for reconnections to happen
+
 /**
  * define node.js libraries and dependencies
 **/
@@ -46,6 +54,7 @@ var http 	= require('http');
 var excel 	= require('excel');
 var xlsx 	= require('xlsx-writer');
 var csv 	= require('fast-csv');
+var io 		= require('socket.io-client');
 
 /**
  * define stdin variables and settings used in the command line
@@ -114,6 +123,69 @@ function parseBarcode(code) {
 		console.log('You must be new here... ('+ code +')');
 	}
 };
+
+/**
+ * define api server connection
+ */
+var apiserver = null;
+var isAPIServerOnline = false;
+var callbacksOnAPIServerOnline = [];
+
+if(API_SERVER_URL) {
+	try {
+		apiserver = io.connect(API_SERVER_URL);
+	} catch(e) {
+
+		console.log('SOCKET', 'Connection to API server unavailable, re-establishing...');
+
+		var triesLeft = API_SERVER_TIMEOUT;
+		var ras_timeout = null;
+		var success = false;
+
+		function reconnect_api_server() {
+
+			triesLeft--;
+			
+			if(triesLeft < 0 || success) {
+				var message = 'Reconnection attepts to API server exceeded. Data for this event will NOT be synced.';
+				return console.log('SOCKET', message);
+			}
+
+			clearTimeout(ras_timeout);
+
+			try {
+				apiserver = io.connect(API_SERVER_URL);
+				console.log('SOCKET', 'Connection to API server established... Syncing enabled for this event.');
+				success = true;
+			} catch(e) {
+				ras_timeout = setTimeout(reconnect_api_server, API_SERVER_R_FREQ);
+			}
+			
+		}
+
+		// begin reconnection attempt
+		ras_timeout = setTimeout(reconnect_api_server, API_SERVER_R_FREQ);
+	}
+}
+
+// define apiserver listeners
+if(API_SERVER_URL && apiserver) {
+
+	// client_Register authenticates client with server
+	// once connected, all callbacks are cleared once called
+	apiserver.on('client_Register', function(id) {
+
+		console.log('SOCKET', 'Connected to API server (' + API_SERVER_URL + ')... Syncing enabled for this event.');
+
+		isAPIServerOnline = true;
+		for(var i = 0; i < callbacksOnAPIServerOnline.length; i++) {
+			callbacksOnAPIServerOnline[i].call();
+		}
+
+		callbacksOnAPIServerOnline = [];
+
+	});
+}
 
 /**
  * define main app settings and methods
@@ -196,12 +268,12 @@ var mysql = {
 			mysql.connection.connect(function(err) {
 				// check to see if connection was successful
 				if(err) {
-					console.log('Error establishing a connection to the mysql server -> '+err);
+					console.log('MYSQL', 'Error establishing a connection to the mysql server -> '+err);
 
 					return;
 				}
 
-				console.log('successfully connected to mysql server');
+				console.log('MYSQL', 'Successfully connected to mysql server');
 			});
 
 			// tell connection flag that connection was successful
@@ -914,6 +986,7 @@ http.createServer(function(req, res) {
  * @param eventName	= {String} containing current event's name assigned through the client by user
 **/
 function addToMysqlEventsTableUsingName(eventName) {
+
 	// now that a name for this event has been passed, assign in to our mysql object, if eventName is null or
 	// undefined, use default name of global_date.
 	mysql.eventTableName = eventName || global_date;
@@ -988,6 +1061,28 @@ function addToMysqlEventsTableUsingName(eventName) {
  * @param callback 		 	= {Function} 	to be called when mysql database query is complete.
 **/
 function importDataTablesFromMysql(callback) {
+
+}
+
+/**
+ * Takes an event name and data to send to the API server
+ * Data must be a JSON object. If the API server is unavailable,
+ * a callback function is created and stored to be called once
+ * the server becomes available
+ */
+function emitAPIServer(eventName, data, callback) {
+	
+	callback = callback && typeof callback == 'function' ? callback : function() {};
+
+	if(API_SERVER_URL && apiserver && isAPIServerOnline) {
+		apiserver.emit(eventName, data);
+		callback.call();
+	} else if(API_SERVER_URL && !isAPIServerOnline) {
+		callbacksOnAPIServerOnline.push(function() {
+			apiserver.emit(eventName, data);
+			callback.call();
+		});
+	}
 
 }
 
@@ -1242,11 +1337,17 @@ function exportDatabase(type, fname, callback) {
 		
 		// if new entries have been added to the local database object, add them to our mysql database as well
 		database.forEach(function(entry, index) {
+
 			// check to see if entry in list of new entries for this event has already been added as new value to mysql
 			// table 'students'
 			if(!entry.existsInMysqlDatabase) {
 				// log that we are adding a newly registered person to the 'students' table in mysql database
 				console.log('adding new entry with id ' + entry.id + ' to the student mysql table.');
+
+				// sync with remote API server
+				emitAPIServer('add_newstudent', entry, function() {
+					console.log('SOCKET', 'Adding new student entry to API server database with id ', entry.id);
+				});
 
 				// insert new entry into database
 				mysql.insertInto(
@@ -1266,11 +1367,11 @@ function exportDatabase(type, fname, callback) {
 					}
 				);
 			}
-
 				
 			// if entry has not been 'deleted' and it has been registered in to the current event
 			// and it hasn't yet added to table containing list of students who showed up to event, insert it
 			if(entry.registered && !entry.addedToCurrentMysqlEventTable && !entry.deleted) {
+
 				// log that we are adding registered student to the mysql database
 				console.log('adding registered entry with id ' + entry.id + ' to the current event table in mysql server.');
 
@@ -1285,11 +1386,17 @@ function exportDatabase(type, fname, callback) {
 						// check for errors
 						if(err) {
 							// log error and exit
-							return console.log('[Fatal]: an error inserting new students into mysql table \'students\' -> ' + err);
+							return console.log('[Fatal]: an error ocurred inserting new students into mysql table \'' + global_date + '\' -> ' + err);
 						}
 
 						// if no error, tell program new entry has been added
 						entry.addedToCurrentMysqlEventTable = true;
+
+						// sync with remote API server if possible
+						emitAPIServer('add_registeredstudent', entry, function() {
+							console.log('SOCKET', 'Syncing', entry.id, 'with API server');
+						});
+
 					}
 				);
 			}
@@ -1313,6 +1420,7 @@ function exportDatabase(type, fname, callback) {
  * for the current event
 **/
 function generateOutputMysqlTable() {
+
 	// store name of our output table for ease of access to it
 	var outputTableName = global_date + '_output';
 	
@@ -1338,7 +1446,7 @@ function generateOutputMysqlTable() {
 			// check for errors
 			if(err) {
 				// if an error occurrs creating table for current event, 
-				return console.log('[Fatal]: An error occurred creating a mysql table for the current event -> ' + err);
+				return console.log('MYSQL', '[Fatal]: An error occurred creating a mysql table for the current event -> ' + err);
 			}
 
 			// if no errors occur, truncate the table to resave all updated data to it
@@ -1346,7 +1454,7 @@ function generateOutputMysqlTable() {
 				.query('TRUNCATE TABLE ' + outputTableName, function(err) {
 					if(err) {
 						// log error and exit
-						return console.log('[Fatal]: An error occurred truncating mysql output table for current event -> ' + err);
+						return console.log('MYSQL', '[Fatal]: An error occurred truncating mysql output table for current event -> ' + err);
 					}
 
 					// if no errors, iterate through local database object entries
@@ -1362,13 +1470,13 @@ function generateOutputMysqlTable() {
 								// check for errors
 								if(err) {
 									// log error and exit
-									return console.log('[Fatal]: an error inserting new students into mysql table \'' + outputTableName + '\' -> ' + err);
+									return console.log('MYSQL', '[Fatal]: an error inserting new students into mysql table \'' + outputTableName + '\' -> ' + err);
 								}
 
 								// check to see if index of current entry is last one
 								if(index + 1 == database.size()) {
 									// log that we are done creating output table in database
-									console.log('successfully created output table in mysql database!');
+									console.log('MYSQL', 'successfully created output table in mysql database!');
 								}
 							}
 						);
@@ -1390,6 +1498,13 @@ function generateOutputMysqlTable() {
 
 	// assign the current date to the database (increase .getMonth() by one since months start at 0)
 	mysql.eventTableName = global_date = (date.getMonth() + 1) + '_' + date.getDate() + '_' + date.getFullYear();
+
+	// sync event database and event data with remote server
+	emitAPIServer('sync_eventName', {
+		eventName: mysql.eventTableName
+	}, function() {
+		console.log('SOCKET', 'Syncing event name with API server');
+	});
 
 	// detect whether an argument was passed @ app begin
 	if(process.argv[2]) {
@@ -1427,7 +1542,7 @@ function generateOutputMysqlTable() {
 			mysql.isBusy = true;
 
 			// tell console we're creating a table for our event instead of updating the mysql database. hopefully just this once.
-			console.log('creating table in mysql database for the current event');
+			console.log('MYSQL', 'creating table in mysql database for the current event');
 
 			// create mysql table for current event if it doesn't exist
 			mysql.connect()
@@ -1447,11 +1562,11 @@ function generateOutputMysqlTable() {
 					// check for error
 					if(err) {
 						// if an error occurrs creating table for current event, 
-						return console.log('[Fatal]: An error occurred creating a mysql table for the current event -> ' + err);
+						return console.log('MYSQL', '[Fatal]: An error occurred creating a mysql table for the current event -> ' + err);
 					}
 
 					// if table creation succeeds, tell console it has been created
-					console.log('mysql table successfully created for this event.');
+					console.log('MYSQL', 'table successfully created for this event.');
 
 					// and also tell program table now exists
 					mysql.eventTableCreated = true;
@@ -1510,6 +1625,13 @@ function generateOutputMysqlTable() {
 								database.statistics.average 	/= rows.length;
 								database.statistics.averageNew	/= rows.length;
 
+							});
+
+							// sync event database and event data with remote server
+							emitAPIServer('sync_database', {
+								entries: database.entries
+							}, function() {
+								console.log('SOCKET', 'Syncing database entries with API server');
 							});
 
 							// add table with default name (global_name) to events table in mysql server null

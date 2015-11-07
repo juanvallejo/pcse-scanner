@@ -1,0 +1,18 @@
+# individual student records
+SELECT t1.event_id, t2.first, t2.last, t3.event_name FROM `attendance` AS t1 INNER JOIN `students` AS t2 ON t1.student_id=t2.student_id INNER JOIN `events` AS t3 ON t3.table_name=t1.event_id WHERE t2.last='peyton' AND t3.year='2015' AND t3.semester='fall'
+
+# insert into attendance records
+INSERT INTO `attendance` (`student_id`, `event_id`, `is_new`)
+VALUES
+	('00887640', '11_5_2015', 1);
+
+# export pizza my mind results from a specific event table
+SELECT t1.first, t1.last, t1.major, t1.email, t2.student_id AS at_event, t2.is_new FROM `students` AS t1 LEFT JOIN `11_5_2015` AS t2 ON t1.student_id = t2.student_id
+
+# export pizza my mind results using `attendance` table
+SELECT t1.student_id, t1.first, t1.last, t1.email, t1.year, t1.major, STRCMP(IFNULL(t2.student_id, ''), '') AS at_event, IFNULL(t2.is_new, '0') AS is_new FROM `students` AS t1 LEFT JOIN `attendance` AS t2 ON t1.student_id=t2.student_id AND t2.event_id='11_5_2015'
+
+# add new student into `students` and `students_2014_2015` table
+INSERT INTO `students_2014_2015` (`student_id`, `last`, `first`, `year`, `major`, `email`, `date_added`)
+VALUES
+	('00901459', 'Negrin', 'David', '2018', 'Information Systems', 'david.negrin.14@cnu.edu', '11_5_2015');

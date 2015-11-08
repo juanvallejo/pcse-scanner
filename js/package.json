@@ -1,7 +1,7 @@
 {
   "name": "pcse-scanner",
   "version": "1.0.0",
-  "description": "pcse-scanner ============",
+  "description": "pcse-scanner",
   "main": "js/scanner.js",
   "scripts": {
     "test": "test"
@@ -21,6 +21,7 @@
     "fast-csv": "^0.6.0",
     "mysql": "^2.9.0",
     "node-xlsx": "^0.6.0",
+    "socket.io-client": "^1.3.7",
     "xlsx-writer": "0.0.10"
   }
 }

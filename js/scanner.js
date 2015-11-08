@@ -25,6 +25,10 @@
 
 var DEBUG 				= true; 							// turns debug mode on or off for local development
 
+if(DEBUG) {
+	console.log('WARN', 'DEBUG', 'Client running in debug mode.');
+}
+
 // define server constants
 var SERVER_PORT 		= 8000;								// port at which to have server listen for connections
 var SERVER_HOST 		= '0.0.0.0'; 						// listening for connections in all layers of app stack
@@ -526,6 +530,7 @@ var database = {
 	// define fields and flags
 	populated 		: false,												// indicates whether database has been populated by external bank of data (through mysql or excel)
 	entries 		: [],
+	attendance 		: [],
 	raw_data 		: [],
 	last_reg 		: [],
 	last_new_reg 	: [],
@@ -1264,9 +1269,10 @@ function exportDatabase(type, fname, callback) {
 	// back online, it is not spammed with 'export' requests
 	if(api.isConnected()) {
 		api.send('eventdata', {
-			students: database.entries
+			students: database.entries,
+			attendance: database.attendance
 		}, function() {
-			console.log('API', 'Syncing database (student) entries with API server');
+			console.log('API', 'Syncing database (student, attendance) entries with API server');
 		});
 	}
 
@@ -1405,6 +1411,26 @@ function exportDatabase(type, fname, callback) {
 					}
 				);
 
+				// sync with local attendance table
+				var existsInAttendanceArray = false;
+				for(var i = 0; i < database.attendance.length && !existsInAttendanceArray; i++) {
+					if(entry.id == database.attendance[i].student_id) {
+						existsInAttendanceArray = true;
+					}
+				}
+
+				// add entry fields to attendance only if it has not been
+				// added before. Only for use with remote API syncing
+				if(!existsInAttendanceArray) {
+					database.attendance.push({
+						student_id: entry.id,
+						event_id: global_date,
+						is_new: 1
+					});
+
+					console.log('LOCAL', 'SYNC', 'Added new entry', entry.fname, entry.lname, '(', entry.id, ') to local database attendance.');
+				}
+
 				// add to `attendance` table
 				mysql.connect().query(
 
@@ -1430,10 +1456,25 @@ function exportDatabase(type, fname, callback) {
 				// log that we are adding registered student to the mysql database
 				console.log('MYSQL', 'INFO', 'Adding registered entry with id ' + entry.id + ' to the current event table in mysql server.');
 
-				// sync with remote API server
-				api.send('studentregister', entry, function() {
-					console.log('API', 'Adding existing student entry to API server database with id', entry.id);
-				});
+				// sync with local attendance table
+				var existsInAttendanceArray = false;
+				for(var i = 0; i < database.attendance.length && !existsInAttendanceArray; i++) {
+					if(entry.id == database.attendance[i].student_id) {
+						existsInAttendanceArray = true;
+					}
+				}
+
+				// add entry fields to attendance only if it has not been
+				// added before. Only for use with remote API syncing
+				if(!existsInAttendanceArray) {
+					database.attendance.push({
+						student_id: entry.id,
+						event_id: global_date,
+						is_new: entry.isNew
+					});
+
+					console.log('LOCAL', 'SYNC', 'Added entry', entry.fname, entry.lname, '(', entry.id, ') to local database attendance.');
+				}
 
 				entry.addedToCurrentMysqlEventTable = true;
 
@@ -1536,7 +1577,7 @@ function generateOutputData() {
 			return console.log('MYSQL', 'ERR', 'EXPORT', err);
 		}
 
-		console.log('MYSQL', 'EXPORT', 'Selected', rows.length, 'rows to export. Work in progress...');
+		console.log('EXCEL', 'EXPORT', 'Selected', rows.length, 'rows to export. Work in progress...');
 		generateSpreadheetFromdata(rows);
 
 	});
@@ -1658,6 +1699,8 @@ function generateOutputData() {
 							// check to see if there are values stored in table
 							if(evtRows.length) {
 
+								database.attendance = evtRows;
+
 								// iterate through table data
 								evtRows.forEach(function(row) {
 
@@ -1707,15 +1750,15 @@ function generateOutputData() {
 								database.statistics.average 	/= (rows.length > 1 ? rows.length - 1 : 0);
 								database.statistics.averageNew	/= (rows.length > 1 ? rows.length - 1 : 0);
 
-							});
+								// sync event database and event data with remote server
+								api.send('eventdata', {
+									students: database.entries,
+									attendance: database.attendance,
+									events: rows
+								}, function() {
+									console.log('API', 'Syncing database entries with API server');
+								});
 
-							// sync event database and event data with remote server
-							api.send('eventdata', {
-								students: database.entries,
-								events: rows,
-								attendance: evtRows,
-							}, function() {
-								console.log('API', 'Syncing database entries with API server');
 							});
 
 							// update event table with statistical information

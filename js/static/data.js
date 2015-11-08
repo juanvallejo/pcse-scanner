@@ -481,9 +481,10 @@ window.addEventListener('load', function() {
 					});
 				}
 			} else {
+
 				// if the registering-new-student 'reg' property is set on the input and value matches a string,
 				// or if there is no 'reg' property set and the value matches a number (for a student id), continue
-				if((!sid.reg && sid.value.match(/[0-9]{8}/gi)) || (sid.reg && sid.dataState != null)) {
+				if((!sid.reg && sid.value.match(/^(00|000)[1-9]{5,6}/gi)) || (sid.reg && sid.dataState != null)) {
 					// if the 'register' flag is set, meaning we want to add a new entry and
 					// that a dataState exists
 					if(sid.reg && sid.dataState) {
@@ -538,9 +539,10 @@ window.addEventListener('load', function() {
 						}
 
 					} else {
+
 						// store data to be sent as post request to server containing
 						// entry information such as name, id, major, etc.
-						var data = "id=" + sid.value.substring(2);
+						var data = "id=" + sid.value;
 
 						// default uri for logging already existing entries
 						var uri = '/register';
@@ -589,7 +591,7 @@ window.addEventListener('load', function() {
 							if(this.readyState == 4 && this.status == 200) {
 								var student = JSON.parse(this.responseText);
 								
-								sid.state = 2;									// state of 2 tells input field to reset its value
+								sid.state = 2; // state of 2 tells input field to reset its value
 
 								// if the entry exists in the server 'database'
 								if(student.registered) {

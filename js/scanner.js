@@ -564,6 +564,7 @@ var database = {
 			}
 
 		} else {
+
 			// assume mysql data (in form of JSON objects) otherwise
 			database.entries.push({
 				index 							: 	database.entries.length,
@@ -679,7 +680,7 @@ var database = {
 		var existsInMysql = (callback && typeof callback == 'boolean' ? callback : false);
 
 		if(existsInMysql) {
-			console.log('REGISTER', 'DUPLICATE', 'The entry with id', entry.student_id, 'already exists in the MySQL database.');
+			console.log('REGISTER', 'DUPLICATE', 'The entry with id', entry.id, 'already exists in the MySQL database.');
 		}
 
 		if(typeof entry == 'object') {
@@ -691,6 +692,7 @@ var database = {
 			database.last_reg.push(entry);
 
 		} else {
+
 			// if entry is a string, we assume we are given its id. Find object from id and store it
 			database.last_reg.push(database.find({
 				id: entry
@@ -721,6 +723,7 @@ var database = {
 	registerNew:function(entry) {
 		// register the entry normally
 		database.register(entry, function(registeredEntry) {
+
 			// once it's registered, increase new count and add entry to new array
 
 			// tell program whether entry is new
@@ -741,9 +744,16 @@ var database = {
 	 * Differs from registerNew method in that it doesn't 're-add' entry back into the local database object
 	 */
 	registerNewFromMysql:function(entry) {
+
 		// register the entry normally
 		database.register(entry, function(registeredEntry) {
 			// once it's registered, increase new count and add entry to new array
+
+			var foundEntry = database.find({
+				id: registeredEntry.id
+			});
+
+			foundEntry[0].addedToCurrentMysqlEventTable = true;
 
 			// tell program whether entry is new
 			registeredEntry.isNew = true;
@@ -902,7 +912,7 @@ http.createServer(function(req, res) {
 			});
 			req.on('end',function() {
 				var entry 	= {};									// create a new entry object with fields passed from client
-				var values 	= value.split('&');						// create array of key-value pairs of passed data
+				var values 	= decodeURIComponent(value).split('&');	// create array of key-value pairs of passed data
 
 				// create response object
 				var response = {};
@@ -915,9 +925,6 @@ http.createServer(function(req, res) {
 					// add key-value pair to entry object
 					entry[valuePair[0]] = valuePair[1];
 				});
-
-				// format the entry id to include two 0's in front of number to match database format
-				entry.student_id = entry.student_id;
 
 				// #todo change format of name in client side
 				console.log('Registering \'' + entry.first + ' ' + entry.last + '\' with ID ' + entry.student_id);
@@ -1406,9 +1413,12 @@ function exportDatabase(type, fname, callback) {
 					"	('" + entry.id + "', '" + global_date + "', 1);",
 
 				function(err) {
+					
 					if(err) {
 						return console.log('FATAL', 'MYSQL', 'INSERT{NewStudent->attendance}', err);
 					}
+
+					entry.addedToCurrentMysqlEventTable = true;
 				});
 
 			}
@@ -1650,6 +1660,7 @@ function generateOutputData() {
 
 								// iterate through table data
 								evtRows.forEach(function(row) {
+
 									// attempt to find current entry in local database object
 									var entry = database.find({
 										id : row.student_id
@@ -1657,8 +1668,10 @@ function generateOutputData() {
 
 									// if value is found in local database object by its id...
 									if(entry.length) {
+
 										// ...set its flag indicating that its added to current event table in mysql server to true
 										entry[0].addedToCurrentMysqlEventTable = true;
+										entry[0].registered = true;
 
 										// populate entry caches to let program know entry is indeed newly registered
 										if(row.is_new) {

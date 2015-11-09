@@ -311,6 +311,12 @@ var api = {
 
 		});
 
+		api.connection.on('disconnect', function() {
+			api._isConnected = false;
+			api.emit('disconnected');
+			console.log('API', 'Connection to server lost. Attempting to reconnect...');
+		});
+
 	}
 }
 
@@ -1389,11 +1395,6 @@ function exportDatabase(type, fname, callback) {
 				// log that we are adding a newly registered person to the 'students' table in mysql database
 				console.log('MYSQL', 'INSERT', 'INFO', 'adding new entry with id ' + entry.id + ' to the student mysql table.');
 
-				// sync with remote API server
-				api.send('studentregister', entry, function() {
-					console.log('API', 'Adding new student entry to API server database with id', entry.id);
-				});
-
 				// insert new entry into database
 				mysql.insertInto(
 
@@ -1408,6 +1409,20 @@ function exportDatabase(type, fname, callback) {
 
 						// if no error, tell program new entry has been added
 						entry.existsInMysqlDatabase = true;
+					}
+				);
+
+				// insert into master database
+				mysql.insertInto(
+
+					'students_master', 
+					['student_id', 'last', 'first', 'year', 'major', 'email', 'date_added'],
+					[entry.id, entry.lname, entry.fname, entry.year, entry.major, entry.email, global_date],
+
+					function(err) {
+						if(err) {
+							return console.log('FATAL', 'MYSQL', 'INSERT{NewStudent->students_master}', err);
+						}
 					}
 				);
 

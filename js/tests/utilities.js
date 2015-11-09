@@ -24,7 +24,7 @@ mysql.connect(function(err) {
 	// initPopulateEventsSemesterAndYear();
 	// initPopulateMasterStudenRecordsWithDiff();
 	// initDetectDuplicatesOnTable('9_10_2015');
-	initDetectDuplicatesOnAttendance('11_7_2015');
+	// initDetectDuplicatesOnAttendance('10_15_2015');
 
 });
 

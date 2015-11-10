@@ -317,6 +317,10 @@ var api = {
 			console.log('API', 'Connection to server lost. Attempting to reconnect...');
 		});
 
+		api.connection.on('requestattendancedata', function(data) {
+			api.emit('requestattendancedata', data);
+		});
+
 	}
 }
 
@@ -1599,6 +1603,26 @@ function generateOutputData() {
 	
 }
 
+function syncAttendanceTableWithAPIServer(callback) {
+
+	// get dataset containing hash of latest attendance result
+	mysql.connect().query('SELECT MD5(concat(student_id, event_id, is_new, COUNT(*))) AS md5, COUNT(*) AS total FROM `attendance` ORDER BY student_id DESC', function(err, rows) {
+
+		if(err) {
+			return console.log('API', 'SYNC', 'ERR', err);
+		}
+
+		api.send('eventdata', {
+			attendanceHash: rows[0]
+		}, function() {
+			if(callback && typeof callback == 'function') {
+				callback.call();
+			}
+		});
+
+	});
+}
+
 /**
  * Main function. Initializes program by fetching data from mysql
  * database, in order, by last_name ascending and populating database
@@ -1608,6 +1632,33 @@ function generateOutputData() {
 
 	// initialize api connection
 	api.connect();
+
+	// request attendance hash as soon as API server connects
+	api.on('connected', function() {
+		syncAttendanceTableWithAPIServer(function() {
+			console.log('API', 'SYNC', 'Successfully synced `attendance` database with the API server.');
+		});
+	});
+
+	// request for full attendance data from API server
+	// fetch all entries and send  via 'attendancedata' event.
+	api.on('requestattendancedata', function(data) {
+
+		console.log('API', 'SYNC', 'ATTENDANCE', 'Attendance data requested by API server. Sending...');
+
+		mysql.connect().query('SELECT * FROM `attendance`', function(err, rows) {
+
+			if(err) {
+				return console.log('MYSQL', 'SYNC', 'ATTENDANCE', 'ERR', err);
+			}
+
+			api.send('attendancedata', {
+				attendanceData: rows
+			});
+
+		});
+
+	});
 
 	// create new instance of a date object
 	var date = new Date();

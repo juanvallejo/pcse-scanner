@@ -23,7 +23,7 @@
 * BUG: two extra zeroes are omitted before every new student ID
 */
 
-var DEBUG 				= true; 							// turns debug mode on or off for local development
+var DEBUG 				= false; 							// turns debug mode on or off for local development
 
 if(DEBUG) {
 	console.log('WARN', 'DEBUG', 'Client running in debug mode.');
@@ -1640,8 +1640,8 @@ function syncAttendanceTableWithAPIServer(callback) {
 		});
 	});
 
-	// request for full attendance data from API server
-	// fetch all entries and send  via 'attendancedata' event.
+	// listen for full attendance data request from API server
+	// fetch all entries and send via 'attendancedata' event.
 	api.on('requestattendancedata', function(data) {
 
 		console.log('API', 'SYNC', 'ATTENDANCE', 'Attendance data requested by API server. Sending...');

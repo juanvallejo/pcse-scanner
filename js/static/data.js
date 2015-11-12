@@ -484,7 +484,7 @@ window.addEventListener('load', function() {
 
 				// if the registering-new-student 'reg' property is set on the input and value matches a string,
 				// or if there is no 'reg' property set and the value matches a number (for a student id), continue
-				if((!sid.reg && sid.value.match(/^(00|000)[1-9]{5,6}/gi)) || (sid.reg && sid.dataState != null)) {
+				if((!sid.reg && sid.value.match(/^(00|000)[0-9]{5,6}/gi)) || (sid.reg && sid.dataState != null)) {
 					// if the 'register' flag is set, meaning we want to add a new entry and
 					// that a dataState exists
 					if(sid.reg && sid.dataState) {

@@ -27,7 +27,7 @@ html,body {
 body {
 
 	background:black url(bg/bg.jpg) no-repeat 0 0 fixed;
-	/*background:rgb(4,13,20);*/
+	/*background:rgb(0,0,0);*/
 	background-size:cover;
 	color:rgb(85,85,85);
 	float:left;

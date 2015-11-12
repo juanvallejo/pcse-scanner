@@ -11,7 +11,7 @@
 * Reads data from a local mysql database, builds an internal structure
 * with it, and allows for easy manipulation of it. Outputs to .xlsx file.
 *
-* Note: @callback_params are parameters passed to a callback function
+* Note: @callback_params are parameters a callback function receives
 *
 * Important: Requires the following dependencies / node.js packages:
 *
@@ -20,13 +20,16 @@
 * 		- mysql	-> npm install mysql
 * 		- xlsx 	-> npm install xlsx-writer
 *
-* BUG: two extra zeroes are omitted before every new student ID
 */
 
 var DEBUG 				= false; 							// turns debug mode on or off for local development
 
+// used to host remote data for access with API
+var API_SERVER_URL 		= 'https://pmm-rubyserverapps.rhcloud.com:8443';
+
 if(DEBUG) {
 	console.log('WARN', 'DEBUG', 'Client running in debug mode.');
+	API_SERVER_URL = 'http://localhost:7777';
 }
 
 // define server constants
@@ -45,8 +48,6 @@ var MYSQL_DEFAULT_PASS	= '';								// define password for mysql server
 var MYSQL_DEFAULT_DB 	= 'pizza_my_mind';					// define default mysql database name
 var MYSQL_DEFAULT_USER	= 'root';							// define username for mysql server
 
-var API_SERVER_URL 		= (DEBUG ? 'http://localhost:7777' : 
-			'https://pmm-rubyserverapps.rhcloud.com:8443'); // used to host remote data for access with API
 var API_SERVER_TIMEOUT 	= 3; 								// if unable to connect to the remote API server,
 															// client will attempt to reconnect n more times before giving up
 var API_SERVER_R_FREQ 	= 5000; 							// time in milliseconds for reconnections to happen
@@ -307,7 +308,7 @@ var api = {
 			api._isConnected = true;
 			api.emit('connected', data.id);
 
-			console.log('API', 'Connection established. Syncing enabled.');
+			console.log('API', 'Connection established with', API_SERVER_URL ,'. Syncing enabled.');
 
 		});
 

@@ -482,11 +482,10 @@ window.addEventListener('load', function() {
 				}
 			} else {
 
-				if(sid.value.match(/^20/gi)) {
+				// strip first two numbers from student ID
+				if(sid.value.match(/^20(00|000)[0-9]{5,6}/gi)) {
 					sid.value = sid.value.substring(2, sid.value.length);
 				}
-
-				console.log(sid.value);
 
 				// if the registering-new-student 'reg' property is set on the input and value matches a string,
 				// or if there is no 'reg' property set and the value matches a number (for a student id), continue

@@ -24,7 +24,20 @@ mysql.connect(function(err) {
 	// initPopulateEventsSemesterAndYear();
 	// initPopulateMasterStudenRecordsWithDiff();
 	// initDetectDuplicatesOnTable('9_10_2015');
-	// initDetectDuplicatesOnAttendance('10_15_2015');
+
+	// check for duplicates accross all events
+	initDetectDuplicatesOnAttendance('11_12_2015');
+	initDetectDuplicatesOnAttendance('11_5_2015');
+	initDetectDuplicatesOnAttendance('10_29_2015');
+	initDetectDuplicatesOnAttendance('10_22_2015');
+	initDetectDuplicatesOnAttendance('10_15_2015');
+	initDetectDuplicatesOnAttendance('10_8_2015');
+	initDetectDuplicatesOnAttendance('10_1_2015');
+	initDetectDuplicatesOnAttendance('9_24_2015');
+	initDetectDuplicatesOnAttendance('9_17_2015');
+	initDetectDuplicatesOnAttendance('9_10_2015');
+	initDetectDuplicatesOnAttendance('9_3_2015');
+	initDetectDuplicatesOnAttendance('8_27_2015');
 
 });
 

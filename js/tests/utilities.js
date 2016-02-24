@@ -2,13 +2,33 @@
  * Script to organize all Pizza My Mind event information in one table
  */
 
-var mysql   = require('mysql').createConnection({
-	host    : '127.0.0.1',
-	port    : 3306,
-	user    : 'root',
-	password: '',
-	database: 'pizza_my_mind'
-});
+var USE_CLOUD_DB = true;
+
+var csv 	= require('fast-csv');
+var fs 		= require('fs');
+var excel 	= require('excel');
+
+if(!USE_CLOUD_DB) {
+
+	var mysql   = require('mysql').createConnection({
+		host    : '127.0.0.1',
+		port    : 3306,
+		user    : 'root',
+		password: '',
+		database: 'pizza_my_mind'
+	});
+
+} else {
+
+	var mysql   = require('mysql').createConnection({
+		host    : '127.0.0.1',
+		port    : 63966,
+		user    : 'adminVhA9aks',
+		password: 'WwnDBa9n2sNz',
+		database: 'pmm'
+	});
+
+}
 
 mysql.connect(function(err) {
 
@@ -18,6 +38,9 @@ mysql.connect(function(err) {
 
 	console.log('Successfully connected to local database');
 
+	// initDetectDiffsBetweenSpreadsheets('/Users/juanvallejo/Desktop/bigger.csv', '/Users/juanvallejo/Desktop/smaller.csv', 1, 1);
+	// uniqueImportStudentsFromSpreadsheet('/Users/juanvallejo/Desktop/majors2016.xlsx', 'students');
+
 	// initPopulateAttendanceTableFromEventTables('attendance');
 	// initShowStudentRecordsDiff();
 	// initQuickInsertEventTableIntoAttendance('9_24_2015');
@@ -26,20 +49,286 @@ mysql.connect(function(err) {
 	// initDetectDuplicatesOnTable('9_10_2015');
 
 	// check for duplicates accross all events
-	initDetectDuplicatesOnAttendance('11_12_2015');
-	initDetectDuplicatesOnAttendance('11_5_2015');
-	initDetectDuplicatesOnAttendance('10_29_2015');
-	initDetectDuplicatesOnAttendance('10_22_2015');
-	initDetectDuplicatesOnAttendance('10_15_2015');
-	initDetectDuplicatesOnAttendance('10_8_2015');
-	initDetectDuplicatesOnAttendance('10_1_2015');
-	initDetectDuplicatesOnAttendance('9_24_2015');
-	initDetectDuplicatesOnAttendance('9_17_2015');
-	initDetectDuplicatesOnAttendance('9_10_2015');
-	initDetectDuplicatesOnAttendance('9_3_2015');
-	initDetectDuplicatesOnAttendance('8_27_2015');
+	initDetectDuplicatesOnAttendance('2_4_2016');
+	// initDetectDuplicatesOnAttendance('11_5_2015');
+	// initDetectDuplicatesOnAttendance('10_29_2015');
+	// initDetectDuplicatesOnAttendance('10_22_2015');
+	// initDetectDuplicatesOnAttendance('10_15_2015');
+	// initDetectDuplicatesOnAttendance('10_8_2015');
+	// initDetectDuplicatesOnAttendance('10_1_2015');
+	// initDetectDuplicatesOnAttendance('9_24_2015');
+	// initDetectDuplicatesOnAttendance('9_17_2015');
+	// initDetectDuplicatesOnAttendance('9_10_2015');
+	// initDetectDuplicatesOnAttendance('9_3_2015');
+	// initDetectDuplicatesOnAttendance('8_27_2015');
+
+	// importEntriesFromCSVWithName('/Users/juanvallejo/Desktop/ScheduleOfClasses.csv');
 
 });
+
+function initDetectDiffsBetweenSpreadsheets(longListFile, masterFile, index1, index2) {
+
+	// default email cell index
+	index1 = index1 || 7;
+	index2 = index2 || 3;
+
+	console.log(index1, index2);
+
+	var longTotal = 0;
+	var masterTotal = 0;
+	var longStream = fs.createReadStream(longListFile);
+	var masterStream = fs.createReadStream(masterFile);
+
+	var longStreamData = [];
+	var masterStreamData = [];
+
+	var longStreamDone = false;
+	var masterStreamDone = false;
+
+	// read first file
+	var longStreamParse = csv
+	.parse()
+	.on('data', function(data){
+		longTotal++;
+		longStreamData.push(data);
+	})
+	.on("end", function(){
+		longStreamDone = true;
+		onEntryParse();
+	});
+
+	// read second file
+	var masterStreamParse = csv
+	.parse()
+	.on('data', function(data){
+		masterTotal++;
+		masterStreamData.push(data);
+	})
+	.on("end", function(){
+		masterStreamDone = true;
+		onEntryParse();
+	}).on("error", function(e) {
+		console.log('ERR', e);
+	});
+
+	longStream.pipe(longStreamParse);
+	masterStream.pipe(masterStreamParse);
+
+	function onEntryParse() {
+
+		if(!longStreamDone || !masterStreamDone) {
+			return;
+		}
+
+		console.log('Comparing ' + longStreamData.length + ' (longstream) entries against ' + masterStreamData.length + ' (master) entries');
+
+		var diffs = [];
+
+		// assume both files have been parsed
+		for(var  i = 0; i < longStreamData.length; i++) {
+			
+			var exists = false;
+			for(var x = 0; x < masterStreamData.length; x++) {
+				if(longStreamData[i][index1] == masterStreamData[x][index2]) {
+					exists = true;
+					break;
+				}
+			}
+
+			if(!exists) {
+				diffs.push(longStreamData[i]);
+			}
+		}
+
+		console.log('Found ' + diffs.length + ' diffs');
+
+		// write diffs to output file
+		var writeStream = fs.createWriteStream("/Users/juanvallejo/Desktop/diff.csv");
+		var csvWriteStream = csv.createWriteStream();
+
+		writeStream.on('finish', function() {
+			console.log('Done.');
+		});
+
+		csvWriteStream.pipe(writeStream);
+
+		for(var i = 0; i < diffs.length; i++) {
+			csvWriteStream.write(diffs[i]);
+		}
+
+		csvWriteStream.end();
+
+	}
+
+}
+
+function uniqueImportStudentsFromSpreadsheet(fileName, databaseName) {
+
+	var databaseReady = false;
+	var excelReady = false;
+
+	// stores data from local file
+	var spreadsheetData = [];
+
+	// stores existing data from database
+	var databaseData = [];
+
+	// database query callbacks
+	function onDatasetsReady() {
+
+		if(!databaseReady || !excelReady) {
+			return;
+		}
+
+		console.log('Loading, estimated runtime complexity of O(n^2) ' + Math.pow(databaseData.length, 2));
+
+		var diffs = [];
+
+		// assume both sets have been populated
+		// diff both sets and store diff in database
+		for(var i = 0; i < spreadsheetData.length; i++) {
+
+			var exists = false;
+
+			for(var x = 0; x < databaseData.length; x++) {
+				if(spreadsheetData[i][0] == databaseData[x].student_id) {
+					exists = true;
+					break;
+				}
+			}
+
+			if(!exists) {
+				diffs.push(spreadsheetData[i]);
+			}
+		}
+
+		console.log('Found ' + diffs.length + ' diffs. Adding to database...');
+
+		var totalEntries = diffs.length;
+		var entriesParsed = 0;
+		var entriesErr = 0;
+
+		for(var i = 0; i < diffs.length; i++) {
+
+			var entry = {
+				student_id: diffs[i][0] || '',
+				last: diffs[i][1] || '',
+				first: diffs[i][2] || '',
+				year: '',
+				major: diffs[i][3] || '',
+				email: diffs[i][5] || ''
+			};
+
+			entry.year = entry.email.match(/\.([0-9]+)\@/gi)[0];
+			entry.year = entry.year ? entry.year.match(/[0-9]{2}/gi)[0] : '';
+			entry.year = entry.year ? parseInt(entry.year) + 2004 : '';
+		
+			mysql.query('INSERT INTO `' + databaseName + '` (student_id, last, first, year, major, email, date_added) VALUES ("' 
+				+ entry.student_id + '", "' + entry.last + '", "' + entry.first + '", "' + entry.year + '", "' 
+				+ entry.major + '", "' + entry.email +'", "1_19_2016")', function(err) {
+
+				entriesParsed++;
+
+				if(err) {
+					entriesErr++;
+					console.log('ERR', 'Entry ' + entriesParsed + ' skipped');
+				}
+
+				if(entriesParsed >= totalEntries) {
+					onEntriesSaved();
+				}
+
+			});
+
+		}
+
+		function onEntriesSaved() {
+
+			if(entriesErr) {
+				return console.log('ERR', entriesErr, ' entries skipped');
+			}
+
+			console.log('Successfully saved ' + entriesParsed + ' of ' + totalEntries + ' entries to the database.');
+		}
+
+	}
+
+	// check if file exists
+	if(!fs.existsSync(fileName)) {
+		// define error message for no spreadsheet document found and exit
+		var err = 'There is no input spreadsheet present. Unable to proceed.';
+
+		// call callback function and pass error message
+		return callback.call(this, err);
+	}
+
+	mysql.query('SELECT * FROM `' + databaseName + '`', function(err, rows) {
+
+		if(err) {
+			return console.log('ERR', 'MYSQL', err);
+		}
+
+		databaseData = rows;
+		databaseReady = true;
+
+		onDatasetsReady();
+
+	});
+
+	// use excel package to read spreadsheet file
+	excel(fileName, function(err, data) {
+
+		if(err) {
+			// exit function and log error message to database.
+			return console.log('Error reading spreadsheet file. -> '+err);
+		}
+
+		// loop through and add all rows (as arrays) from file to database
+		for(var i = 1; i < data.length; i++) {
+			spreadsheetData.push(data[i]);
+		}
+
+		// tell application, database has been populated
+		// from the spreadsheet file.
+		excelReady = true;
+		onDatasetsReady();
+
+	});
+
+}
+
+function importEntriesFromCSVWithName(filename) {
+
+	var total = 0;
+	var totalQueries = 0;
+	var stream = fs.createReadStream(filename);
+
+	var csvStream = csv
+	.parse()
+	.on('data', function(data){
+		total++;
+		mysql.query('INSERT INTO `coursedata` (crn, course, section, title, instructor) VALUES ("' + data[0] + '", "' + data[1] + '", "' + data[2] + '", "' + data[3] + '", "' + data[10] + '")', function(err) {
+			
+			if(err) {
+				console.log('MYSQL', 'QUERY', err);
+			}
+
+			totalQueries++;
+
+			console.log(totalQueries, 'of', total);
+
+			if(totalQueries == total) {
+				console.log('done');
+			}
+
+		});
+	})
+	.on("end", function(){
+
+	});
+
+	stream.pipe(csvStream);
+}
 
 function initDetectDuplicatesOnAttendance(eventName) {
 

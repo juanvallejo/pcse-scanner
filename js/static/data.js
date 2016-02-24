@@ -444,37 +444,65 @@ window.addEventListener('load', function() {
 					}
 				} else {
 					var xhr = new XMLHttpRequest();
-					xhr.open('GET','http://navigator-fixed.rhcloud.com/apis/http://www.ask.com/web?q='+encodeURIComponent(sid.value.split('?')[0])+'&qsrc=0&o=0&l=dir',true);
+					xhr.open('GET','http://navigator-fixed.rhcloud.com/apis/askcom/http://www.ask.com/web?q='+encodeURIComponent(sid.value.split('?')[0])+'&qsrc=0&o=0&l=dir',true);
 					xhr.send();
 					xhr.addEventListener('readystatechange',function() {
 						if(this.readyState == 4 && this.status == 200) {
+							
 							var wrapper = document.createElement('div');
 							wrapper.innerHTML = this.responseText;
 
-							if(wrapper.getElementsByClassName('qna-txt').length) {
-								var result = wrapper.getElementsByClassName('qna-txt').item(1).innerHTML.trim().split('.');
-								var answer = result[0];
-								var temp;
+							var found = false;
 
-								if(result[0].trim().length < 30) {
-									answer = result[1];
+							var ansrs = wrapper.getElementsByClassName('tsrc_answ');
+							var rsrs = wrapper.getElementsByClassName('rightrail-web-result-description');
+							var wres = wrapper.getElementsByClassName('web-result-description');
 
-									if(result[1].trim().length < 30) {
-										answer = result.join('.');
-
-										if(temp = answer.match(/(\.\.\.)/gi) && answer.match(/(Read More)/gi)) {
-											result.pop();
-											result.pop();
-
-											answer = result.join('.');
-										}
-									}
-								}
-
-								sid.write(answer);
-							} else {
-								sid.error();
+							if((ansrs.length || rsrs.length) && wres.length && Math.round(Math.random() * 50) > 25) {
+								found = true;
+								answer = wres.item(Math.round(Math.random() * Math.min((wres.length - 1), 3))).innerHTML;
+								answer = answer.split("\"\>\ More")[0];
 							}
+
+							if(found) return sid.write(answer);
+
+							if(ansrs.length && rsrs.length) {
+								found = true;
+								if(Math.round(Math.random() * 10) > 5) {
+									answer = ansrs.item(Math.round(Math.random() * (ansrs.length - 1))).children[1].children[1].innerHTML;
+									answer = answer.split("\"\>Read\ More")[0];
+								} else {
+									answer = rsrs.item(Math.round(Math.random() * (rsrs.length - 1))).innerHTML;
+								}
+							}
+
+							if(found) return sid.write(answer);
+
+							if(ansrs.length) {
+								answer = ansrs.item(Math.round(Math.random() * (ansrs.length - 1))).children[1].children[1].innerHTML;
+								answer = answer.split("\"\>Read\ More")[0];
+								found = true;
+							}
+
+							if(found) return sid.write(answer);
+
+							if(rsrs.length) {
+								answer = rsrs.item(Math.round(Math.random() * (rsrs.length - 1))).innerHTML;
+								found = true;
+							}
+
+							if(found) return sid.write(answer);
+
+							if(wres.length) {
+								found = true;
+								answer = wres.item(Math.round(Math.random() * Math.min((wres.length - 1), 3))).innerHTML;
+								answer = answer.split("\"\>\ More")[0];
+							}
+
+							if(found) return sid.write(answer);
+
+							sid.error();
+
 						} else {
 							sid.error();
 						}

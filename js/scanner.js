@@ -22,7 +22,8 @@
 *
 */
 
-var DEBUG 				= false; 							// turns debug mode on or off for local development
+var DEBUG 				= (process.argv[2] == '--debug' 	// turns debug mode on or off for local development
+							|| process.argv[2] == '-d'); 
 
 // used to host remote data for access with API
 var API_SERVER_URL 		= 'https://pmm-rubyserverapps.rhcloud.com:8443';
@@ -1632,7 +1633,7 @@ function syncAttendanceTableWithAPIServer(callback) {
 (function main() {
 
 	// initialize api connection
-	api.connect();
+	if(!DEBUG) api.connect();
 
 	// request attendance hash as soon as API server connects
 	api.on('connected', function() {

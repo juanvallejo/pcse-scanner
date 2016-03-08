@@ -2,7 +2,7 @@
  * Script to organize all Pizza My Mind event information in one table
  */
 
-var USE_CLOUD_DB = true;
+var USE_CLOUD_DB = false;
 
 var csv 	= require('fast-csv');
 var fs 		= require('fs');
@@ -66,6 +66,9 @@ mysql.connect(function(err) {
 
 });
 
+/**
+ *  
+ */
 function initDetectDiffsBetweenSpreadsheets(longListFile, masterFile, index1, index2) {
 
 	// default email cell index
@@ -162,7 +165,13 @@ function initDetectDiffsBetweenSpreadsheets(longListFile, masterFile, index1, in
 
 }
 
-function uniqueImportStudentsFromSpreadsheet(fileName, databaseName) {
+/**
+ * @spreadsheet (.xlsx)
+ * Assumes file being read is of type excel spreadsheet
+ * Retrieves unique values from a spreadsheet file and 
+ * stores them in the specified table
+ * /
+function uniqueImportStudentsFromSpreadsheet(fileName, tableName) {
 
 	var databaseReady = false;
 	var excelReady = false;
@@ -223,7 +232,7 @@ function uniqueImportStudentsFromSpreadsheet(fileName, databaseName) {
 			entry.year = entry.year ? entry.year.match(/[0-9]{2}/gi)[0] : '';
 			entry.year = entry.year ? parseInt(entry.year) + 2004 : '';
 		
-			mysql.query('INSERT INTO `' + databaseName + '` (student_id, last, first, year, major, email, date_added) VALUES ("' 
+			mysql.query('INSERT INTO `' + tableName + '` (student_id, last, first, year, major, email, date_added) VALUES ("' 
 				+ entry.student_id + '", "' + entry.last + '", "' + entry.first + '", "' + entry.year + '", "' 
 				+ entry.major + '", "' + entry.email +'", "1_19_2016")', function(err) {
 
@@ -262,7 +271,7 @@ function uniqueImportStudentsFromSpreadsheet(fileName, databaseName) {
 		return callback.call(this, err);
 	}
 
-	mysql.query('SELECT * FROM `' + databaseName + '`', function(err, rows) {
+	mysql.query('SELECT * FROM `' + tableName + '`', function(err, rows) {
 
 		if(err) {
 			return console.log('ERR', 'MYSQL', err);

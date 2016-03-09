@@ -133,6 +133,11 @@ window.addEventListener('load', function() {
 	var out = document.getElementById('out');				// define interface 'console' output for errors and alerts
 	var sid = document.getElementById('sid-input');			// define variable to hold main scanner input element
 	var statsOut = document.getElementById('stats1Out');
+	
+	window.addEventListener('keydown', function(e) {
+		sid.focus();
+		sid_handle_kbdevent(e);
+	});
 
 	// define main circle containing amount of current registrants
 	var statsOutProgress = new ProgressBar.Circle('#stats1', {
@@ -297,7 +302,8 @@ window.addEventListener('load', function() {
 	 * 
 	 * @event keydown
 	 */
-	sid.addEventListener('keydown', function(e) {
+	function sid_handle_kbdevent(e) {
+		
 		if(e.keyCode == 13) {
 			// if enter key is pressed
 			sid.write('');
@@ -683,6 +689,7 @@ window.addEventListener('load', function() {
 				// clear input
 				sid.write('');
 			}
+			sid.blur();
 		} else {
 			if(sid.state == 2) {
 				// change input value type from 
@@ -695,5 +702,5 @@ window.addEventListener('load', function() {
 				sid.value = '';
 			}			
 		}
-	});
+	} // sid_handle_kbdevent
 });

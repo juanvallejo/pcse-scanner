@@ -1282,9 +1282,10 @@ function exportDatabase(type, fname, callback) {
 	if(api.isConnected()) {
 		api.send('eventdata', {
 			students: database.entries,
-			attendance: database.attendance
+			attendance: database.attendance,
+			eventname: mysql.eventTableName
 		}, function() {
-			console.log('API', 'Syncing database (student, attendance) entries with API server');
+			console.log('API', 'Syncing database (student, attendance, eventname) entries with API server');
 		});
 	}
 

@@ -115,7 +115,7 @@ var scanner = {
 
 		// check for individual event data
 		var local_outputfile_exists = false;
-		if(fs.existsSync(EXCEL_RESULTS_DIR + scanner.getEventId() + '_' + consts.EXCEL_OUTPUT_FILE)) {
+		if(fs.existsSync(consts.EXCEL_RESULTS_DIR + scanner.getEventId() + '_' + consts.EXCEL_OUTPUT_FILE)) {
 			local_outputfile_exists = true;
 		}
 
@@ -176,7 +176,7 @@ var scanner = {
 	 *
 	 * @param eventName	= {String} containing current event's name assigned through the client by user
 	**/
-	updateEventName: function(mysql, eventName) {
+	updateEventName: function(mysql, api, eventName) {
 
 		// now that a name for this event has been passed, assign in to our mysql object, if eventName is null or
 		// undefined, use default name of scanner.getEventId().
@@ -204,10 +204,15 @@ var scanner = {
 			} else {
 				console.log('MYSQL', 'UPDATE', 'Successfully renamed event entry ' + scanner.getEventId() + ' to ' + scanner.getEventName() + ' in mysql events table.');
 			}
+
+		});
+
+		api.send('eventdata', {
+			eventname: scanner.getEventName()
 		});
 	},
 
-	exportDatabase: function(api, output, type, fname, callback) {
+	exportDatabase: function(db, mysql, api, output, type, fname, callback) {
 
 		// sync with api server, prevent queuing if server
 		// is offline, this is so that if the server comes
@@ -265,11 +270,11 @@ var scanner = {
 		scanner.event_name = eventId;
 	},
 
-	init_autosave: function(api, output, method) {
+	init_autosave: function(db, mysql, api, output, method) {
 
 		clearTimeout(scanner.autosave.setTimeout);
 		scanner.autosave.setTimeout = setTimeout(function() {
-			scanner.exportDatabase(api, output, method, consts.EXCEL_AUTOSAVE_FILE, function(err) {
+			scanner.exportDatabase(db, mysql, api, output, method, consts.EXCEL_AUTOSAVE_FILE, function(err) {
 
 				if(err) {
 					return console.log('There was an error auto-saving to the database: ' + err);
@@ -280,7 +285,7 @@ var scanner = {
 				// set timeout of 60 seconds
 				clearTimeout(scanner.autosave.setTimeout);
 				scanner.autosave.setTimeout = setTimeout(function() {
-					scanner.init_autosave.call(scanner, api, output, method);
+					scanner.init_autosave.call(scanner, db, mysql, api, output, method);
 				}, (1000 * 60));
 
 			});

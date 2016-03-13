@@ -10,7 +10,7 @@ var fs 		= require('fs');
 var http 	= require('http');
 var routes 	= require('./routes.js');
 var mimes 	= require('./mimes.js');
-var consts 	= require('./consts.js');
+var consts 	= require('./constants.js');
 
 var server = {
 
@@ -148,7 +148,7 @@ var server = {
 			// activate spreadsheet export
 			if(command[2] && command[2] == 'excel') {
 
-				scanner.exportDatabase(api, output, 'excel', function(err) {
+				scanner.exportDatabase(db, mysql, api, output, 'excel', function(err) {
 
 					if(err) {
 						return res.end('ERR: There was an error exporting the data:', err);
@@ -164,21 +164,22 @@ var server = {
 
 				// override second command if mysql server is currently being used for data
 				// by exporting database we are simply updating new entries and registered students
-				scanner.exportDatabase(api, output, (mysql.isConnected ? 'mysql' : command[2]), function(err) {
+				scanner.exportDatabase(db, mysql, api, output, (mysql.isConnected ? 'mysql' : command[2]), function(err) {
 
 					if(err) {
 						// send error message back to client and exit
 						return res.end('ERR: There was an error exporting the data: '+err);
 					}
 
-					// advertise method of database export
 					console.log('EXPORT', 'MYSQL', 'database exported through mysql command');
-
-					// send success message back to client
 					res.end('success');
 
 					// if mysql db is available, also generate a spreadsheet file
-					exportDatabase('excel');
+					scanner.exportDatabase(db, mysql, api, output, 'excel', function(err) {
+						if(!err) {
+							console.log('EXPORT', 'EXCEL', 'Successfully generated excel spreadsheet for event.');
+						}
+					});
 
 				});
 
@@ -194,7 +195,7 @@ var server = {
 				// set global event name,
 				// add event with its new name to the 'events' table in the mysql database
 				db.global_values[0] = decodeURIComponent(command[3] + ' (' + scanner.getEventId() + ')');
-				scanner.updateEventName(mysql, decodeURIComponent(command[3]));
+				scanner.updateEventName(mysql, api, decodeURIComponent(command[3]));
 
 				// send success message back to client
 				res.end('success');

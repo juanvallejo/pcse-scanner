@@ -38,7 +38,7 @@ mysql.connect(function(err) {
 
 	console.log('Successfully connected to local database');
 
-	// initDetectDiffsBetweenSpreadsheets('/Users/juanvallejo/Desktop/bigger.csv', '/Users/juanvallejo/Desktop/smaller.csv', 1, 1);
+	initDetectDiffsBetweenSpreadsheets('/Users/juanvallejo/Desktop/bigger.csv', '/Users/juanvallejo/Desktop/smaller.csv', 1, 1);
 	// uniqueImportStudentsFromSpreadsheet('/Users/juanvallejo/Desktop/majors2016.xlsx', 'students');
 
 	// initPopulateAttendanceTableFromEventTables('attendance');

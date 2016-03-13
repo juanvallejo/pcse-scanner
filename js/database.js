@@ -334,7 +334,7 @@ var database = {
 	// create event entry in `events` table, gather statistical analysis data
 	// from previous events, re-populate previous data if restoring session
 	// from previous event
-	initializeEventEntry: function(scanner, mysql, callback) {
+	initializeEventEntry: function(scanner, mysql, api, callback) {
 
 		// tell program mysql process is busy
 		mysql.isBusy = true;
@@ -435,7 +435,7 @@ var database = {
 
 					});
 			});
-	}
+	},
 
 	init: function(scanner, mysql, api, output) {
 
@@ -471,7 +471,7 @@ var database = {
 				scanner.populateDatabaseFromMysql(database, rows, function(err) {				
 
 					if(!mysql.eventEntryCreated) {
-						database.initializeEventEntry(scanner, mysql, function() {
+						database.initializeEventEntry(scanner, mysql, api, function() {
 							database.emit('ready', ['mysql']);
 						});
 					}
@@ -492,7 +492,7 @@ var database = {
 					}
 
 					// once internal database object has data in it, export data to mysql server if empty
-					scanner.exportDatabase(api, output, 'mysql', consts.EXCEL_AUTOSAVE_FILE, function(err) {
+					scanner.exportDatabase(database, mysql, api, output, 'mysql', consts.EXCEL_AUTOSAVE_FILE, function(err) {
 
 						if(err) {
 							console.log('An error occurred populating empty mysql database -> ' + err);

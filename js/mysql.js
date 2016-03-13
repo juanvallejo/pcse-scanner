@@ -29,10 +29,10 @@ var mysql = {
 		if(!mysql.isConnected || (host && user && password)) {
 			// create connection blueprint
 			mysql.connection = mysql.library.createConnection({
-				host: 			host || MYSQL_DEFAULT_HOST,
-				user: 			user || MYSQL_DEFAULT_USER,
-				pass: 		password || MYSQL_DEFAULT_PASS,
-				database: 	database || MYSQL_DEFAULT_DB
+				host: 			host || consts.MYSQL_DEFAULT_HOST,
+				user: 			user || consts.MYSQL_DEFAULT_USER,
+				pass: 		password || consts.MYSQL_DEFAULT_PASS,
+				database: 	database || consts.MYSQL_DEFAULT_DB
 			});
 
 			// create connection to server
@@ -163,7 +163,7 @@ var mysql = {
 					return callback.call(mysql, err);
 				});
 	}
-	
+
 };
 
 module.exports = mysql;

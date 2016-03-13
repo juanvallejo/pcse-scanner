@@ -2,7 +2,8 @@
  * define api server connection
  */
 
-var io = require('socket.io-client');
+var consts 	= require('./constants.js');
+var io 		= require('socket.io-client');
 
 var api = {
 	
@@ -44,7 +45,7 @@ var api = {
 		// tell api object we have at least tried
 		// to connect to server
 		api._connection_attempt_happened = true;
-		api._reconnect_attempts_left = API_SERVER_TIMEOUT;
+		api._reconnect_attempts_left = consts.API_SERVER_TIMEOUT;
 
 		try {
 			api.connection = io.connect(consts.API_SERVER_URL);

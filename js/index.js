@@ -67,7 +67,7 @@ var server 	= require('./server.js');
 	// initialize database
 	db.init(scanner, mysql, api, output);
 	db.on('ready', function(save_method) {
-		scanner.init_autosave(db, mysql, api, output, save_method);
+		scanner.init_autosave(scanner, db, mysql, api, output, save_method);
 	});
 
 	// initialize http server
@@ -107,7 +107,7 @@ var server 	= require('./server.js');
 		semester: date.get_semester(),
 		year: date.get_year()
 	}, function() {
-		console.log('API', 'Syncing event name with API server');
+		console.log('API', 'Successfully synced event name with API server.');
 	});
 
 })();

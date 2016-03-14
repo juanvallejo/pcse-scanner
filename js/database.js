@@ -196,11 +196,11 @@ var database = {
 		var existsInMysql = (callback && typeof callback == 'boolean' ? callback : false);
 
 		if(existsInMysql) {
-			console.log('REGISTER', 'DUPLICATE', 'The entry with id', entry.id, 'already exists in the MySQL database.');
+			console.log('REGISTER', 'DUPLICATE', 'The entry with id "', entry.id, '" already exists in the MySQL database.');
 		}
 
 		if(typeof entry == 'object') {
-			// tell program entry is now registered
+
 			entry.registered = true;
 			entry.addedToCurrentMysqlEventTable = existsInMysql;
 
@@ -227,7 +227,7 @@ var database = {
 		database.statistics.registeredCount++;
 
 		// make sure callback is of type function
-		callback = (typeof callback == 'function' && callback) || function() {};
+		callback = (callback && typeof callback == 'function') || function() {};
 
 		// call callback function to continue
 		callback.call(this, entry); 
@@ -327,7 +327,7 @@ var database = {
 	setRawData:function(data) {
 		raw_data = data;
 	},
-	size:function(a) {
+	size: function(a) {
 		return a == 'registered' ? database.statistics.registeredCount : database.entries.length;
 	},
 
@@ -368,7 +368,7 @@ var database = {
 							return console.log('MYSQL', 'QUERY', 'An error occurred attempting to check previously stored data in mysql event table -> ' + err);
 						}
 
-						// check to see if there are values stored in table
+						// restore previous data to program database if any
 						if(evtRows.length) {
 
 							database.attendance = evtRows;
@@ -390,7 +390,6 @@ var database = {
 
 									// populate entry caches to let program know entry is indeed newly registered
 									if(row.is_new) {
-										// register entry as new
 										database.registerNewFromMysql(entry[0]);
 									} else {
 										database.register(entry[0], consts.ENTRY_EXISTS_IN_MYSQL_DB);
@@ -398,8 +397,6 @@ var database = {
 								}								
 							});
 						}
-
-						// calculate data averages and analysis
 
 						// select all table entries from 'events' table to gather previous data
 						mysql.selectFrom('events', ['*'], null, function(err, rows, fields) {
@@ -409,11 +406,22 @@ var database = {
 							}
 
 							// iterate through events adding its total amount of guests to local database's average (recording total)
+							// if current event row contains previously assigned name, recover it
 							rows.forEach(function(row) {
+								
 								if(row.table_name != scanner.getEventId()) {
 									database.statistics.average += row.total;
 									database.statistics.averageNew += row.total_new;
+								} else {
+									
+									console.log('Recovering previous event name', row.event_name);
+									
+									if(row.event_name != scanner.getEventName()) {
+										scanner.updateEventName(scanner, mysql, api, row.event_name);
+									}
+
 								}
+
 							});
 
 							// calculate actual averages by dividing total result by amount of rows
@@ -448,7 +456,7 @@ var database = {
 				console.log('WARN', 'MYSQL', 'Using spreadsheet file to populate database instead. (' + err + ')');
 
 				// populate database from spreadsheet and exit
-				return scanner.populateDatabaseFromSpreadsheet(database, function(err) {
+				return scanner.populateDatabaseFromSpreadsheet(scanner, database, function(err) {
 
 					if(err) {
 						// if fallback spreadsheet implementation errors, advertise error message and exit.
@@ -468,7 +476,7 @@ var database = {
 				mysql.hasData = true;
 
 				// then, begin adding such data to internal database object
-				scanner.populateDatabaseFromMysql(database, rows, function(err) {				
+				scanner.populateDatabaseFromMysql(scanner, database, rows, function(err) {				
 
 					if(!mysql.eventEntryCreated) {
 						database.initializeEventEntry(scanner, mysql, api, function() {
@@ -485,14 +493,14 @@ var database = {
 
 				// if no data in database, use spreadsheet data to populate our local database object, and then
 				// use the newly populated local 'database' object to populate mysql server database
-				scanner.populateDatabaseFromSpreadsheet(database, function(err) {
+				scanner.populateDatabaseFromSpreadsheet(scanner, database, function(err) {
 
 					if(err) {
 						return console.log('[Fatal]: Error populating local database object from spreadsheet -> ' + err);
 					}
 
 					// once internal database object has data in it, export data to mysql server if empty
-					scanner.exportDatabase(database, mysql, api, output, 'mysql', consts.EXCEL_AUTOSAVE_FILE, function(err) {
+					scanner.exportDatabase(scanner, database, mysql, api, output, 'mysql', consts.EXCEL_AUTOSAVE_FILE, function(err) {
 
 						if(err) {
 							console.log('An error occurred populating empty mysql database -> ' + err);

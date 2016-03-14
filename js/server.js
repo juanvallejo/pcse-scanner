@@ -148,7 +148,7 @@ var server = {
 			// activate spreadsheet export
 			if(command[2] && command[2] == 'excel') {
 
-				scanner.exportDatabase(db, mysql, api, output, 'excel', function(err) {
+				scanner.exportDatabase(scanner, db, mysql, api, output, 'excel', function(err) {
 
 					if(err) {
 						return res.end('ERR: There was an error exporting the data:', err);
@@ -164,7 +164,7 @@ var server = {
 
 				// override second command if mysql server is currently being used for data
 				// by exporting database we are simply updating new entries and registered students
-				scanner.exportDatabase(db, mysql, api, output, (mysql.isConnected ? 'mysql' : command[2]), function(err) {
+				scanner.exportDatabase(scanner, db, mysql, api, output, (mysql.isConnected ? 'mysql' : command[2]), function(err) {
 
 					if(err) {
 						// send error message back to client and exit
@@ -175,7 +175,7 @@ var server = {
 					res.end('success');
 
 					// if mysql db is available, also generate a spreadsheet file
-					scanner.exportDatabase(db, mysql, api, output, 'excel', function(err) {
+					scanner.exportDatabase(scanner, db, mysql, api, output, 'excel', function(err) {
 						if(!err) {
 							console.log('EXPORT', 'EXCEL', 'Successfully generated excel spreadsheet for event.');
 						}
@@ -195,7 +195,7 @@ var server = {
 				// set global event name,
 				// add event with its new name to the 'events' table in the mysql database
 				db.global_values[0] = decodeURIComponent(command[3] + ' (' + scanner.getEventId() + ')');
-				scanner.updateEventName(mysql, api, decodeURIComponent(command[3]));
+				scanner.updateEventName(scanner, mysql, api, decodeURIComponent(command[3]));
 
 				// send success message back to client
 				res.end('success');
@@ -312,6 +312,7 @@ var server = {
 				req.on('end',function() {
 					server.emit(server.events.EVT_ON_NEWREGISTER, [res, value]);
 				});
+
 			} else {
 				res.end('Invalid request.');
 			}

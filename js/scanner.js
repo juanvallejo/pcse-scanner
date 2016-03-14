@@ -6,7 +6,7 @@ var fs 		= require('fs');
 var excel 	= require('excel');
 var consts 	= require('./constants.js');
 
-var scanner = {
+var _scanner = {
 
 	event_id: consts.GLOBAL_DATE,
 	event_name: consts.GLOBAL_DATE,
@@ -26,10 +26,10 @@ var scanner = {
 	**/
 	emit : function(eventName) {
 		// check if event key has been initialized
-		if(scanner.events.eventName && scanner.events.eventName.length) {
+		if(_scanner.events.eventName && _scanner.events.eventName.length) {
 			// if event key has been created under events, and it contains functions, call them
-			scanner.events.eventName.forEach(function(action) {
-				action.call(scanner);
+			_scanner.events.eventName.forEach(function(action) {
+				action.call(_scanner);
 			});
 		}
 	},
@@ -43,13 +43,13 @@ var scanner = {
 	**/
 	on : function(eventName, callback) {
 		// check to see if event has been created before
-		if(!scanner.events.eventName) {
+		if(!_scanner.events.eventName) {
 			// allocate new entry for eventName, and initialize its array value to hold functions
-			scanner.events.eventName = [];
+			_scanner.events.eventName = [];
 		}
 
 		// add callback function to list of functions to be called when event is emitted.
-		scanner.events.eventName.push(callback);
+		_scanner.events.eventName.push(callback);
 	},
 
 	/**
@@ -60,7 +60,7 @@ var scanner = {
 	 * @callback_param mysql 	= {JSONObject} 	providing 'this' context for callback function
 	 * @callback_param err		= {String}		explaining error for unsuccessful connection to mysql server
 	**/
-	populateDatabaseFromMysql: function(db, rows, callback) {
+	populateDatabaseFromMysql: function(scanner, db, rows, callback) {
 
 			// iterate through rows array and add each row object to the database
 			rows.forEach(function(row, index) {
@@ -109,7 +109,7 @@ var scanner = {
 	 *
 	 * @param callback = {Function} to be called when excel sheet is done being read.
 	**/
-	populateDatabaseFromSpreadsheet: function(db, callback) {
+	populateDatabaseFromSpreadsheet: function(scanner, db, callback) {
 
 		callback = callback || function() {};
 
@@ -176,11 +176,15 @@ var scanner = {
 	 *
 	 * @param eventName	= {String} containing current event's name assigned through the client by user
 	**/
-	updateEventName: function(mysql, api, eventName) {
+	updateEventName: function(scanner, mysql, api, eventName) {
+
+		if(!eventName || eventName == scanner.getEventName()) {
+			return;
+		}
 
 		// now that a name for this event has been passed, assign in to our mysql object, if eventName is null or
 		// undefined, use default name of scanner.getEventId().
-		scanner.event_name = eventName || scanner.getEventName();
+		scanner.event_name = eventName;
 
 		mysql.update(
 
@@ -192,9 +196,8 @@ var scanner = {
 			'table_name = "' + scanner.getEventId() + '"', 
 
 			function(err) {
-			// check for errors
+			
 			if(err) {
-				// log error and exit
 				return console.log('An error occurred updating table name information in mysql server -> ' + err);
 			}
 
@@ -209,10 +212,12 @@ var scanner = {
 
 		api.send('eventdata', {
 			eventname: scanner.getEventName()
+		}, function() {
+			console.log('API', 'Syncing event name with API server');
 		});
 	},
 
-	exportDatabase: function(db, mysql, api, output, type, fname, callback) {
+	exportDatabase: function(scanner, db, mysql, api, output, type, fname, callback) {
 
 		// sync with api server, prevent queuing if server
 		// is offline, this is so that if the server comes
@@ -223,7 +228,7 @@ var scanner = {
 				attendance: db.attendance,
 				eventname: scanner.getEventName()
 			}, function() {
-				console.log('API', 'Syncing database (student, attendance, eventname) entries with API server');
+				console.log('API', 'Syncing database (students, attendance, eventname) entries with API server');
 			});
 		}
 
@@ -255,26 +260,26 @@ var scanner = {
 	},
 
 	setEventId: function(id) {
-		scanner.event_id = id;
+		_scanner.event_id = id;
 	},
 
 	getEventId: function() {
-		return scanner.event_id;
+		return _scanner.event_id;
 	},
 
 	getEventName: function() {
-		return scanner.event_name;
+		return _scanner.event_name;
 	},
 
 	init: function(eventId) {
-		scanner.event_name = eventId;
+		_scanner.event_id = eventId;
 	},
 
-	init_autosave: function(db, mysql, api, output, method) {
+	init_autosave: function(scanner, db, mysql, api, output, method) {
 
-		clearTimeout(scanner.autosave.setTimeout);
-		scanner.autosave.setTimeout = setTimeout(function() {
-			scanner.exportDatabase(db, mysql, api, output, method, consts.EXCEL_AUTOSAVE_FILE, function(err) {
+		clearTimeout(_scanner.autosave.setTimeout);
+		_scanner.autosave.setTimeout = setTimeout(function() {
+			_scanner.exportDatabase(scanner, db, mysql, api, output, method, consts.EXCEL_AUTOSAVE_FILE, function(err) {
 
 				if(err) {
 					return console.log('There was an error auto-saving to the database: ' + err);
@@ -283,9 +288,9 @@ var scanner = {
 				console.log('AUTOSAVE', 'The database has been auto-saved using method \'' + method + '\'.');
 
 				// set timeout of 60 seconds
-				clearTimeout(scanner.autosave.setTimeout);
-				scanner.autosave.setTimeout = setTimeout(function() {
-					scanner.init_autosave.call(scanner, db, mysql, api, output, method);
+				clearTimeout(_scanner.autosave.setTimeout);
+				_scanner.autosave.setTimeout = setTimeout(function() {
+					scanner.init_autosave.call(_scanner, scanner, db, mysql, api, output, method);
 				}, (1000 * 60));
 
 			});
@@ -296,4 +301,4 @@ var scanner = {
 
 };
 
-module.exports = scanner;
+module.exports = _scanner;

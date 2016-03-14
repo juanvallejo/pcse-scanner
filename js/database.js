@@ -414,9 +414,8 @@ var database = {
 									database.statistics.averageNew += row.total_new;
 								} else {
 									
-									console.log('Recovering previous event name', row.event_name);
-									
 									if(row.event_name != scanner.getEventName()) {
+										console.log('Recovering previous event name', row.event_name);
 										scanner.updateEventName(scanner, mysql, api, row.event_name);
 									}
 

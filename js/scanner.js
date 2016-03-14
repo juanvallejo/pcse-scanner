@@ -239,7 +239,6 @@ var _scanner = {
 		}
 
 		if(!fname) {
-			// define output file from global setting if none is given
 			fname = consts.EXCEL_OUTPUT_FILE;
 		}
 
@@ -247,7 +246,7 @@ var _scanner = {
 		fname = consts.EXCEL_RESULTS_DIR + scanner.getEventId() + '_' + consts.EXCEL_OUTPUT_FILE;
 
 		if(type == 'excel' || !type) {
-			return output.generateSpreadsheetFromdata(scanner, db.entries, callback);
+			return output.generateSpreadsheetFromData(scanner, db.entries, callback);
 		} else if(type == 'csv') {
 			return output.generateCSVFromData(scanner, db, callback);
 		} else if(type == 'mysql') {

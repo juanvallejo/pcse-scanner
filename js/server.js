@@ -174,10 +174,10 @@ var server = {
 					console.log('EXPORT', 'MYSQL', 'database exported through mysql command');
 					res.end('success');
 
-					// if mysql db is available, also generate a spreadsheet file
-					scanner.exportDatabase(scanner, db, mysql, api, output, 'excel', function(err) {
+					// if mysql db is available, also generate a spreadsheet file #excel- #csv+
+					scanner.exportDatabase(scanner, db, mysql, api, output, 'csv', function(err) {
 						if(!err) {
-							console.log('EXPORT', 'EXCEL', 'Successfully generated excel spreadsheet for event.');
+							console.log('EXPORT', 'CSV', 'Successfully generated comma-delimited document for event.');
 						}
 					});
 

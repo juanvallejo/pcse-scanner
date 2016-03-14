@@ -219,23 +219,24 @@ var output = {
 			callback.call(this);
 		});
 
-		// 
 		stream.pipe(writeStream);
 
 		for(var i=0;i<db.size();i++) {
-			stream.write({
+			if(!db.get(i).deleted) {
+				stream.write({
+					
+					ID: db.get(i).id,
+					FIRST: db.get(i).fname,
+					LAST: db.get(i).lname,
+					FIRST: db.get(i).email,
+					YEAR: db.get(i).year,
+					MAJOR: db.get(i).major,
+					EMAIL: db.get(i).email,
+					AT_EVENT: (db.get(i).registered ? '1' : ' '),
+					IS_NEW: (db.get(i).isNew ? '1' : ' ')
 				
-				ID: db.get(i).id,
-				FIRST: db.get(i).fname,
-				LAST: db.get(i).lname,
-				FIRST: db.get(i).email,
-				YEAR: db.get(i).year,
-				MAJOR: db.get(i).major,
-				EMAIL: db.get(i).email,
-				AT_EVENT: db.get(i).registered,
-				IS_NEW: db.get(i).isNew
-			
-			});
+				});
+			}
 		}
 
 		// release file resources and safely close stream
@@ -246,7 +247,7 @@ var output = {
 	/**
 	 * Stores an array of objects into a spreadsheet
 	 */
-	generateSpreadheetFromdata: function(scanner, entries, callback) {
+	generateSpreadsheetFromData: function(scanner, entries, callback) {
 
 		var fname = consts.EXCEL_RESULTS_DIR + scanner.getEventId() + '_' + consts.EXCEL_OUTPUT_FILE;
 
